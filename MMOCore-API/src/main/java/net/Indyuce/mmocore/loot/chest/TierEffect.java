@@ -1,12 +1,12 @@
 package net.Indyuce.mmocore.loot.chest;
 
 import io.lumine.mythic.lib.util.lang3.Validate;
-import net.Indyuce.mmocore.MMOCore;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.loot.chest.particle.ChestParticleEffect;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class TierEffect {
 	private final ChestParticleEffect type;
@@ -24,13 +24,7 @@ public class TierEffect {
 		type.play(loc, particle);
 	}
 
-	public BukkitRunnable startNewRunnable(Location loc) {
-		BukkitRunnable runnable = new BukkitRunnable() {
-			public void run() {
-				type.play(loc, particle);
-			}
-		};
-		runnable.runTaskTimer(MMOCore.plugin, 0, period);
-		return runnable;
+	public ScheduledTask startNewRunnable(Location loc) {
+		return Tasks.runAtTimer(loc, task -> type.play(loc, particle), 1, period);
 	}
 }

@@ -5,6 +5,7 @@ import io.lumine.mythic.lib.command.CommandTreeNode;
 import io.lumine.mythic.lib.command.argument.Argument;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.manager.InventoryManager;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -21,7 +22,7 @@ public class OpenCommandTreeNode extends CommandTreeNode {
     @Override
     public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
         Player player = explorer.parse(argPlayer);
-        InventoryManager.WAYPOINTS.newInventory(PlayerData.get(player)).open();
+        Tasks.openInventory(player, () -> InventoryManager.WAYPOINTS.newInventory(PlayerData.get(player)));
         return CommandResult.SUCCESS;
     }
 }

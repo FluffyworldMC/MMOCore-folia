@@ -10,7 +10,6 @@ import javax.inject.Provider;
 public enum PartyModuleType {
     MMOCORE("MMOCore", MMOCorePartyModule::new),
     NONE("MMOCore", NonePartyModule::new),
-    DUNGEONSXL("DungeonsXL", DungeonsXLPartyModule::new),
     HEROES("Heroes", HeroesPartyModule::new),
     MCMMO("mcMMO", McMMOPartyModule::new),
     MYTHICDUNGEONS_INJECT("MythicDungeons", () -> {

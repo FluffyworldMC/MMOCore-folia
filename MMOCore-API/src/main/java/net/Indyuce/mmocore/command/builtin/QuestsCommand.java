@@ -10,6 +10,7 @@ import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.command.Arguments;
 import net.Indyuce.mmocore.manager.InventoryManager;
 import net.Indyuce.mmocore.quest.provided.MMOCoreQuestModule;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -33,7 +34,7 @@ public class QuestsCommand extends CommandTreeRoot {
         final var playerData = PlayerData.get(player);
         if (MMOCoreUtils.callLegacyCommandEvent(playerData, this)) return CommandResult.FAILURE;
 
-        InventoryManager.QUEST_LIST.newInventory(playerData).open();
+        Tasks.openInventory(player, () -> InventoryManager.QUEST_LIST.newInventory(playerData));
         return CommandResult.SUCCESS;
     }
 }

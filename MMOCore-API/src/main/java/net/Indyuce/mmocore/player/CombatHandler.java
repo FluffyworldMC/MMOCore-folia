@@ -2,12 +2,12 @@ package net.Indyuce.mmocore.player;
 
 import io.lumine.mythic.lib.util.Closeable;
 import io.lumine.mythic.lib.util.lang3.Validate;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.event.PlayerCombatEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Bukkit;
-import org.bukkit.scheduler.BukkitTask;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class CombatHandler implements Closeable {
@@ -17,7 +17,7 @@ public class CombatHandler implements Closeable {
     private boolean pvpMode;
 
     @Nullable
-    private BukkitTask task;
+    private ScheduledTask task;
 
     public static final String COOLDOWN_KEY = "PvpMode";
 
@@ -32,7 +32,7 @@ public class CombatHandler implements Closeable {
 
         // Simply refreshing
         if (isInCombat()) {
-            task.cancel();
+            Tasks.cancel(task);
             task = newTask();
 
             // Entering combat
@@ -44,9 +44,10 @@ public class CombatHandler implements Closeable {
         }
     }
 
-    @NotNull
-    private BukkitTask newTask() {
-        return Bukkit.getScheduler().runTaskLater(MMOCore.plugin, () -> quit(false), MMOCore.plugin.configManager.combatLogTimer);
+    @Nullable
+    private ScheduledTask newTask() {
+        if (!player.isOnline()) return null;
+        return Tasks.runEntityLater(player.getPlayer(), () -> quit(false), MMOCore.plugin.configManager.combatLogTimer);
     }
 
     public boolean isInPvpMode() {
@@ -105,7 +106,7 @@ public class CombatHandler implements Closeable {
      */
     private void quit(boolean cancelTask) {
         Validate.isTrue(isInCombat(), "Player not in combat");
-        if (cancelTask) task.cancel();
+        if (cancelTask) Tasks.cancel(task);
         task = null;
 
         if (player.isOnline()) {

@@ -2,6 +2,7 @@ package net.Indyuce.mmocore.listener.profession;
 
 import io.lumine.mythic.lib.version.Sounds;
 import io.lumine.mythic.lib.version.VParticle;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.event.CustomPlayerFishEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
@@ -11,6 +12,7 @@ import net.Indyuce.mmocore.loot.LootBuilder;
 import net.Indyuce.mmocore.loot.fishing.FishingDropItem;
 import net.Indyuce.mmocore.manager.profession.FishingManager.FishingDropTable;
 import net.Indyuce.mmocore.util.Language;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.*;
 import org.bukkit.entity.FishHook;
 import org.bukkit.entity.Item;
@@ -23,7 +25,6 @@ import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerFishEvent.State;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.HashSet;
@@ -55,7 +56,7 @@ public class FishingListener implements Listener {
         }
     }
 
-    public class FishingData extends BukkitRunnable implements Listener {
+    public class FishingData implements Listener {
         private final Location location;
         private final FishingDropItem caught;
         private final PlayerData playerData;
@@ -65,6 +66,7 @@ public class FishingListener implements Listener {
         private final int fishStrength, experienceDropped, vanillaExpDropped;
 
         private int currentPulls;
+        private ScheduledTask task;
 
         /**
          * Used to track the last time the player swung the fishing rod.
@@ -85,7 +87,7 @@ public class FishingListener implements Listener {
             this.experienceDropped = caught.rollExperience();
             this.vanillaExpDropped = caught.rollVanillaExp();
             fishing.add(player.getUniqueId());
-            runTaskTimer(MMOCore.plugin, 0, 2);
+            task = Tasks.runAtTimer(location, this::tick, 1, 2);
             Bukkit.getPluginManager().registerEvents(this, MMOCore.plugin);
 
             // Check for instant loot
@@ -117,18 +119,32 @@ public class FishingListener implements Listener {
             return currentPulls > fishStrength + 1;
         }
 
-        private void close() {
-            fishing.remove(player.getUniqueId());
-            hook.remove();
+        private boolean closed;
 
+        private void stopTracking() {
+            if (closed) return;
+            closed = true;
+            fishing.remove(player.getUniqueId());
+            Tasks.cancel(task);
             HandlerList.unregisterAll(this);
-            cancel();
         }
 
-        @Override
-        public void run() {
-            if (isTimedOut())
+        private void close() {
+            stopTracking();
+            hook.getScheduler().execute(MMOCore.plugin, () -> {
+                if (hook.isValid()) hook.remove();
+            }, null, 0L);
+        }
+
+        private void tick(ScheduledTask scheduled) {
+            if (closed) {
+                scheduled.cancel();
+                return;
+            }
+            if (isTimedOut()) {
                 close();
+                return;
+            }
 
             location.getWorld().spawnParticle(Particle.CRIT, location, 0, 2 * (RANDOM.nextDouble() - .5), 3, 2 * (RANDOM.nextDouble() - .5), .6);
         }
@@ -140,8 +156,10 @@ public class FishingListener implements Listener {
                 // Lose the catch if the current fish is gone!
                 event.setCancelled(true);
                 if (isTimedOut()) {
-                    close();
-                    hook.getWorld().spawnParticle(VParticle.SMOKE.get(), hook.getLocation(), 16, 0, 0, 0, .1);
+                    hook.getScheduler().execute(MMOCore.plugin, () -> {
+                        hook.getWorld().spawnParticle(VParticle.SMOKE.get(), hook.getLocation(), 16, 0, 0, 0, .1);
+                        close();
+                    }, null, 0L);
                     return;
                 }
 
@@ -155,53 +173,66 @@ public class FishingListener implements Listener {
         }
 
         public void lootFish() {
-            close();
+            if (closed) return;
+            stopTracking();
 
             ItemStack mainhand = player.getInventory().getItem(EquipmentSlot.HAND);
             MMOCoreUtils.decreaseDurability(player,
                     (mainhand != null && mainhand.getType() == Material.FISHING_ROD) ? EquipmentSlot.HAND : EquipmentSlot.OFF_HAND, 1);
 
-            // Critical fishing failure
-            if (!isCriticalFish() && RANDOM.nextDouble() < PlayerData.get(player).getStats().getStat("CRITICAL_FISHING_FAILURE_CHANCE") / 100) {
-                player.setVelocity(hook.getLocation().subtract(player.getLocation()).toVector().setY(0).multiply(3).setY(.5));
-                hook.getWorld().spawnParticle(VParticle.SMOKE.get(), location, 24, 0, 0, 0, .08);
+            final Location playerLoc = player.getLocation().clone();
+            final boolean failed = !isCriticalFish() && RANDOM.nextDouble() < PlayerData.get(player).getStats().getStat("CRITICAL_FISHING_FAILURE_CHANCE") / 100;
+            if (failed) {
+                hook.getScheduler().execute(MMOCore.plugin, () -> {
+                    Vector vec = hook.getLocation().clone().subtract(playerLoc).toVector().setY(0).multiply(3).setY(.5);
+                    hook.getWorld().spawnParticle(VParticle.SMOKE.get(), location, 24, 0, 0, 0, .08);
+                    Tasks.executeEntity(player, () -> player.setVelocity(vec));
+                    if (hook.isValid()) hook.remove();
+                }, null, 0L);
                 return;
             }
 
-            // Find looted item
             ItemStack collect = caught.collect(new LootBuilder(playerData));
             if (collect == null) {
-                hook.getWorld().spawnParticle(VParticle.SMOKE.get(), location, 24, 0, 0, 0, .08);
+                hook.getScheduler().execute(MMOCore.plugin, () -> {
+                    hook.getWorld().spawnParticle(VParticle.SMOKE.get(), location, 24, 0, 0, 0, .08);
+                    if (hook.isValid()) hook.remove();
+                }, null, 0L);
                 return;
             }
 
-            Item item = hook.getWorld().dropItemNaturally(hook.getLocation(), collect);
+            final boolean critical = isCriticalFish();
+            hook.getScheduler().execute(MMOCore.plugin, () -> {
+                Location hookLoc = hook.getLocation().clone();
+                Item item = hook.getWorld().dropItemNaturally(hookLoc, collect);
 
-            // Call Bukkit event
-            var called = new CustomPlayerFishEvent(playerData, item);
-            Bukkit.getPluginManager().callEvent(called);
-            if (called.isCancelled()) {
-                item.remove();
-                return;
-            }
+                var called = new CustomPlayerFishEvent(playerData, item);
+                Bukkit.getPluginManager().callEvent(called);
+                if (called.isCancelled()) {
+                    item.remove();
+                    if (hook.isValid()) hook.remove();
+                    return;
+                }
 
-            // Increase player statistic
-            player.incrementStatistic(Statistic.FISH_CAUGHT);
+                final var languageEntry = critical ? Language.FISH_OUT_WATER_CRIT : Language.FISH_OUT_WATER;
+                MMOCoreUtils.displayIndicator(location.clone().add(0, 1.25, 0), languageEntry.getFormat());
+                Vector vec = playerLoc.clone().subtract(hookLoc).toVector();
+                vec.setY(vec.getY() * .031 + vec.length() * .05);
+                vec.setX(vec.getX() * .08);
+                vec.setZ(vec.getZ() * .08);
+                item.setVelocity(vec);
+                for (int j = 0; j < 8; j++)
+                    location.getWorld().spawnParticle(VParticle.FIREWORK.get(), location, 0, 4 * (RANDOM.nextDouble() - .5), RANDOM.nextDouble() + 1, 4 * (RANDOM.nextDouble() - .5), .08);
+                if (hook.isValid()) hook.remove();
 
-            // Calculate yeet velocity
-            final var languageEntry = isCriticalFish() ? Language.FISH_OUT_WATER_CRIT : Language.FISH_OUT_WATER;
-            MMOCoreUtils.displayIndicator(location.add(0, 1.25, 0), languageEntry.getFormat());
-            Vector vec = player.getLocation().subtract(hook.getLocation()).toVector();
-            vec.setY(vec.getY() * .031 + vec.length() * .05);
-            vec.setX(vec.getX() * .08);
-            vec.setZ(vec.getZ() * .08);
-            item.setVelocity(vec);
-            player.getWorld().playSound(player.getLocation(), Sounds.BLOCK_NOTE_BLOCK_HAT, 1, 0);
-            for (int j = 0; j < 8; j++)
-                location.getWorld().spawnParticle(VParticle.FIREWORK.get(), location, 0, 4 * (RANDOM.nextDouble() - .5), RANDOM.nextDouble() + 1, 4 * (RANDOM.nextDouble() - .5), .08);
-            if (vanillaExpDropped > 0) player.giveExp(vanillaExpDropped);
-            if (experienceDropped > 0 && MMOCore.plugin.fishingManager.hasLinkedProfession())
-                playerData.getCollectionSkills().giveExperience(MMOCore.plugin.fishingManager.getLinkedProfession(), experienceDropped, EXPSource.FISHING, location, true);
+                Tasks.executeEntity(player, () -> {
+                    player.incrementStatistic(Statistic.FISH_CAUGHT);
+                    player.getWorld().playSound(player.getLocation(), Sounds.BLOCK_NOTE_BLOCK_HAT, 1, 0);
+                    if (vanillaExpDropped > 0) player.giveExp(vanillaExpDropped);
+                    if (experienceDropped > 0 && MMOCore.plugin.fishingManager.hasLinkedProfession())
+                        playerData.getCollectionSkills().giveExperience(MMOCore.plugin.fishingManager.getLinkedProfession(), experienceDropped, EXPSource.FISHING, hookLoc, true);
+                });
+            }, null, 0L);
         }
     }
 }

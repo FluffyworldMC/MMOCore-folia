@@ -1,22 +1,25 @@
 package net.Indyuce.mmocore.loot.chest;
 
 import io.lumine.mythic.lib.util.lang3.Validate;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.event.LootChestSpawnEvent;
 import net.Indyuce.mmocore.api.player.PlayerActivity;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.loot.LootBuilder;
 import net.Indyuce.mmocore.loot.RandomWeightedRoll;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 public class LootChestRegion {
@@ -26,14 +29,7 @@ public class LootChestRegion {
     private final RegionBounds bounds;
     private final ChestAlgorithmOptions algOptions;
     private final Set<ChestTier> tiers = new LinkedHashSet<>();
-    private final BukkitRunnable runnable = new BukkitRunnable() {
-
-        @Override
-        public void run() {
-            getBounds().getPlayers().filter(player -> player.getActivityTimeOut(PlayerActivity.LOOT_CHEST_SPAWN) == 0)
-                    .findAny().ifPresent(player -> spawnChest(player));
-        }
-    };
+    private final ScheduledTask task;
 
     private static final Random RANDOM = new Random();
 
@@ -57,8 +53,20 @@ public class LootChestRegion {
 
         Validate.isTrue(!tiers.isEmpty(), "Your region must have at least one chest tier");
 
-        // Run timer
-        runnable.runTaskTimer(MMOCore.plugin, chestSpawnPeriod * 20, chestSpawnPeriod * 20);
+        task = Tasks.runGlobalTimer(this::tick, chestSpawnPeriod * 20, chestSpawnPeriod * 20);
+    }
+
+    private void tick() {
+        AtomicBoolean claimed = new AtomicBoolean();
+        for (Player player : bounds.getWorld().getPlayers()) {
+            player.getScheduler().execute(MMOCore.plugin, () -> {
+                if (claimed.get() || !bounds.isInRegion(player)) return;
+                PlayerData data = PlayerData.get(player);
+                if (data.getActivityTimeOut(PlayerActivity.LOOT_CHEST_SPAWN) != 0) return;
+                if (!claimed.compareAndSet(false, true)) return;
+                spawnChest(data);
+            }, null, 0L);
+        }
     }
 
     public String getId() {
@@ -77,8 +85,8 @@ public class LootChestRegion {
         return chestSpawnPeriod;
     }
 
-    public BukkitRunnable getRunnable() {
-        return runnable;
+    public ScheduledTask getRunnable() {
+        return task;
     }
 
     public void spawnChest(PlayerData player) {
@@ -88,16 +96,35 @@ public class LootChestRegion {
 
         // First randomly determine the chest tier
         ChestTier tier = rollTier(player);
-
-        // Find a random location, 20 trials max
-        Location location = getRandomLocation(player.getPlayer().getLocation());
-        if (location == null)
-            return;
-
-        LootChest lootChest = new LootChest(tier, this, location.getBlock());
         LootBuilder builder = new LootBuilder(player, tier.rollCapacity(player));
         tier.getDropTable().collect(builder);
 
+        // Search columns on the player's region, then place the chest on the column's region.
+        trySpawn(player, tier, builder, player.getPlayer().getLocation(), 0);
+    }
+
+    private void trySpawn(PlayerData player, ChestTier tier, LootBuilder builder, Location center, int attempt) {
+        if (!player.isOnline() || attempt >= algOptions.iterations) return;
+
+        double a = RANDOM.nextDouble() * 2 * Math.PI;
+        Vector dir = new Vector(Math.cos(a), 0, Math.sin(a))
+                .multiply(algOptions.minRange + RANDOM.nextDouble() * (algOptions.maxRange - algOptions.minRange));
+        center.add(dir);
+        Location column = center.clone();
+
+        Tasks.executeAt(column, () -> {
+            Location found = findSuitable(column);
+            if (found == null) {
+                if (player.isOnline())
+                    Tasks.executeEntity(player.getPlayer(), () -> trySpawn(player, tier, builder, center, attempt + 1));
+                return;
+            }
+            placeChest(player, tier, builder, found);
+        });
+    }
+
+    private void placeChest(PlayerData player, ChestTier tier, LootBuilder builder, Location location) {
+        LootChest lootChest = new LootChest(tier, this, location.getBlock());
         LootChestSpawnEvent event = new LootChestSpawnEvent(player, lootChest, builder);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled())
@@ -128,44 +155,13 @@ public class LootChestRegion {
         return new RandomWeightedRoll<>(player, tiers, MMOCore.plugin.configManager.lootChestsChanceWeight).rollItem();
     }
 
-    public Location getRandomLocation(Location center) {
-
-        for (int j = 0; j < algOptions.iterations; j++) {
-            Location random = tryRandomDirection(center);
-            if (random != null)
-                return random;
-        }
-
-        /*
-         * No location has been found after the X iterations, return null and
-         * cancel chest spawning. worst case scenario, should not happen too
-         * often except if the player is in a really NARROW zone
-         */
-        return null;
-    }
-
-    public Location tryRandomDirection(Location center) {
-
-        /*
-         * Chooses a random direction and get the block in
-         * that direction which has the same height as the player
-         */
-        double a = RANDOM.nextDouble() * 2 * Math.PI;
-        Vector dir = new Vector(Math.cos(a), 0, Math.sin(a))
-                .multiply(algOptions.minRange + RANDOM.nextDouble() * (algOptions.maxRange - algOptions.minRange));
-        Location random = center.add(dir);
-
-        /*
-         * Go up and down at the same time till it finds
-         * a non-solid block with a solid block underneath
-         */
+    private Location findSuitable(Location random) {
         for (int h = 0; h <= algOptions.height * 2; h++) {
             int z = h % 2 == 0 ? h / 2 : -(h + 1) / 2; // bijective from N to Z
             Location checked = random.clone().add(0, z, 0);
             if (isSuitable(checked))
                 return checked;
         }
-
         return null;
     }
 

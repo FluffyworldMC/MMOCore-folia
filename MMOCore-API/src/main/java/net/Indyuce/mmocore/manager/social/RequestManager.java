@@ -4,7 +4,7 @@ import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.social.Request;
 import net.Indyuce.mmocore.manager.MMOCoreManager;
-import org.bukkit.Bukkit;
+import net.Indyuce.mmocore.util.Tasks;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,7 +24,7 @@ public class RequestManager implements MMOCoreManager {
     @Override
     public void initialize(boolean clearBefore) {
         if (!ENABLED) {
-            Bukkit.getScheduler().runTaskTimer(MMOCore.plugin, this::flushRequests, 60 * 20, 60 * 20 * 5);
+            Tasks.runGlobalTimer(this::flushRequests, 60 * 20, 60 * 20 * 5);
             ENABLED = true;
         }
     }

@@ -1,16 +1,15 @@
 package net.Indyuce.mmocore.loot.chest.particle;
 
 import io.lumine.mythic.lib.version.VParticle;
-import net.Indyuce.mmocore.MMOCore;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.function.Consumer;
 
-public class ParabolicProjectile extends BukkitRunnable {
+public class ParabolicProjectile {
 	private final Location target;
 	private final Consumer<Location> display;
 	private final Vector vec;
@@ -20,8 +19,7 @@ public class ParabolicProjectile extends BukkitRunnable {
 	// calculation
 	private final Location loc;
 	private int j;
-
-	// private static final Random random = new Random();
+	private boolean cancelled;
 
 	public ParabolicProjectile(Location source, Location target, Color color) {
 		this(source, target, VParticle.REDSTONE.get(), () -> {
@@ -60,19 +58,23 @@ public class ParabolicProjectile extends BukkitRunnable {
 		this.vec = vec;
 		this.speed = Math.max(1, speed);
 
-		runTaskTimer(MMOCore.plugin, 0, 1);
+		Tasks.runAt(loc, this::tick);
 	}
 
-	@Override
-	public void run() {
+	private void tick() {
+		if (cancelled) return;
+
 		for (int k = 0; k < speed; k++) {
 			if (j++ > 100 || loc.distanceSquared(target) < .8) {
+				cancelled = true;
 				end.run();
-				cancel();
+				return;
 			}
 
 			double c = Math.min(1, (double) j / 40);
 			display.accept(loc.add(target.clone().subtract(loc).toVector().normalize().multiply(c).add(vec.clone().multiply(1 - c))));
 		}
+
+		Tasks.runAt(loc, this::tick);
 	}
 }

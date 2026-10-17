@@ -59,13 +59,13 @@ import net.Indyuce.mmocore.skilltree.SkillTreeNode;
 import net.Indyuce.mmocore.skilltree.display.PathState;
 import net.Indyuce.mmocore.skilltree.tree.SkillTree;
 import net.Indyuce.mmocore.util.Language;
+import net.Indyuce.mmocore.util.Tasks;
 import net.Indyuce.mmocore.waypoint.Waypoint;
 import net.Indyuce.mmocore.waypoint.WaypointOption;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -549,7 +549,7 @@ public class PlayerData extends SynchronizedDataHolder implements OfflinePlayerD
         final boolean wasLocked = unlockedItems.add(unlockable.getUnlockNamespacedKey());
         if (wasLocked) {
             unlockable.whenUnlocked(this);
-            Bukkit.getScheduler().runTask(MythicLib.plugin, () -> Bukkit.getPluginManager().callEvent(new ItemUnlockedEvent(this, unlockable.getUnlockNamespacedKey())));
+            scheduleOnPlayer(() -> Bukkit.getPluginManager().callEvent(new ItemUnlockedEvent(this, unlockable.getUnlockNamespacedKey())));
         }
         return wasLocked;
     }
@@ -565,7 +565,7 @@ public class PlayerData extends SynchronizedDataHolder implements OfflinePlayerD
         boolean wasUnlocked = unlockedItems.remove(unlockable.getUnlockNamespacedKey());
         if (wasUnlocked) {
             unlockable.whenLocked(this);
-            Bukkit.getScheduler().runTask(MythicLib.plugin, () -> Bukkit.getPluginManager().callEvent(new ItemLockedEvent(this, unlockable.getUnlockNamespacedKey())));
+            scheduleOnPlayer(() -> Bukkit.getPluginManager().callEvent(new ItemLockedEvent(this, unlockable.getUnlockNamespacedKey())));
         }
         return wasUnlocked;
     }
@@ -990,38 +990,44 @@ public class PlayerData extends SynchronizedDataHolder implements OfflinePlayerD
         setLastActivity(PlayerActivity.USE_WAYPOINT);
         giveStellium(-cost, ResourceUpdateReason.WAYPOINT);
 
-        new BukkitRunnable() {
-            final int x = getPlayer().getLocation().getBlockX();
-            final int y = getPlayer().getLocation().getBlockY();
-            final int z = getPlayer().getLocation().getBlockZ();
-            final int warpTime = target.getWarpTime();
-            final boolean hasPerm = getPlayer().hasPermission("mmocore.bypass-waypoint-wait");
-            int t;
+        final Player player = getPlayer();
+        final int x = player.getLocation().getBlockX();
+        final int y = player.getLocation().getBlockY();
+        final int z = player.getLocation().getBlockZ();
+        final int warpTime = target.getWarpTime();
+        final boolean hasPerm = player.hasPermission("mmocore.bypass-waypoint-wait");
+        final int[] ticks = {0};
 
-            public void run() {
-                if (!isOnline() || getPlayer().getLocation().getBlockX() != x || getPlayer().getLocation().getBlockY() != y || getPlayer().getLocation().getBlockZ() != z) {
-                    if (isOnline()) {
-                        Message.WAYPOINT_TP_CANCEL.send(getPlayer());
-                    }
-                    giveStellium(cost, ResourceUpdateReason.WAYPOINT);
-                    cancel();
-                    return;
-                }
-
-                if (hasPerm || t++ >= warpTime) {
-                    getPlayer().teleport(target.getLocation());
-                    getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 20, 1, false, false));
-                    Message.WAYPOINT_TP_DONE.send(getPlayer(), "waypoint", target.getName());
-                    cancel();
-                    return;
-                }
-
-                Message.WAYPOINT_TP_CHARGE.send(getPlayer(), "left", String.valueOf((warpTime - t) / 20));
-                final double r = Math.sin((double) t / warpTime * Math.PI);
-                for (double j = 0; j < Math.PI * 2; j += Math.PI / 4)
-                    getPlayer().getLocation().getWorld().spawnParticle(VParticle.REDSTONE.get(), getPlayer().getLocation().add(Math.cos((double) 5 * t / warpTime + j) * r, (double) 2 * t / warpTime, Math.sin((double) 5 * t / warpTime + j) * r), 1, new Particle.DustOptions(Color.PURPLE, 1.25f));
+        Tasks.runEntityTimer(player, scheduled -> {
+            if (!isOnline() || player.getLocation().getBlockX() != x || player.getLocation().getBlockY() != y || player.getLocation().getBlockZ() != z) {
+                if (isOnline()) Message.WAYPOINT_TP_CANCEL.send(player);
+                giveStellium(cost, ResourceUpdateReason.WAYPOINT);
+                scheduled.cancel();
+                return;
             }
-        }.runTaskTimer(MMOCore.plugin, 0, 1);
+
+            if (hasPerm || ticks[0]++ >= warpTime) {
+                player.teleportAsync(target.getLocation()).thenAccept(success -> {
+                    if (!Boolean.TRUE.equals(success) || !isOnline()) return;
+                    Tasks.executeEntity(player, () -> {
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 20, 1, false, false));
+                        Message.WAYPOINT_TP_DONE.send(player, "waypoint", target.getName());
+                    });
+                });
+                scheduled.cancel();
+                return;
+            }
+
+            Message.WAYPOINT_TP_CHARGE.send(player, "left", String.valueOf((warpTime - ticks[0]) / 20));
+            final double r = Math.sin((double) ticks[0] / warpTime * Math.PI);
+            for (double j = 0; j < Math.PI * 2; j += Math.PI / 4)
+                player.getWorld().spawnParticle(VParticle.REDSTONE.get(), player.getLocation().add(Math.cos((double) 5 * ticks[0] / warpTime + j) * r, (double) 2 * ticks[0] / warpTime, Math.sin((double) 5 * ticks[0] / warpTime + j) * r), 1, new Particle.DustOptions(Color.PURPLE, 1.25f));
+        }, 1, 1);
+    }
+
+    private void scheduleOnPlayer(Runnable runnable) {
+        if (isOnline()) Tasks.runEntity(getPlayer(), runnable);
+        else Tasks.runGlobal(runnable);
     }
 
     public boolean hasReachedMaxLevel() {
@@ -1208,7 +1214,9 @@ public class PlayerData extends SynchronizedDataHolder implements OfflinePlayerD
      *         event has not been canceled
      */
     public boolean leaveSkillCasting(boolean skipEvent) {
-        Validate.isTrue(isCasting(), "Player not in casting mode");
+        // The player may have already left casting mode, for instance when this
+        // is called while the casting task is being cancelled from another thread.
+        if (!isCasting()) return false;
 
         if (!skipEvent) {
             PlayerExitCastingModeEvent event = new PlayerExitCastingModeEvent(this);

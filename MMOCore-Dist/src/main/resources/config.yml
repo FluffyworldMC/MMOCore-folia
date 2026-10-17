@@ -70,7 +70,6 @@ custom-mining:
 # Supported values (just copy and paste):
 # - MMOCORE (Default built-in party system)
 # - NONE (Used to fully disable parties)
-# - DUNGEONSXL
 # - HEROES
 # - MCMMO
 # - MYTHICDUNGEONS (Make sure `PartyPlugin` is set to `Default` in MythicDungeons)

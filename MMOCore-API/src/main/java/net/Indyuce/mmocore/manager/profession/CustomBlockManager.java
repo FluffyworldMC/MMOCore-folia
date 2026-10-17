@@ -1,13 +1,12 @@
 package net.Indyuce.mmocore.manager.profession;
 
 import io.lumine.mythic.lib.api.MMOLineConfig;
-import io.papermc.lib.PaperLib;
 import net.Indyuce.mmocore.MMOCore;
+import net.Indyuce.mmocore.util.Tasks;
 import net.Indyuce.mmocore.api.block.*;
 import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.loot.chest.condition.Condition;
 import net.Indyuce.mmocore.loot.chest.condition.ConditionInstance;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -17,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.logging.Level;
 
@@ -32,7 +32,7 @@ public class CustomBlockManager extends SpecificProfessionManager {
      * Blocks that are regenerating and that must be refreshed whenever the
      * server reloads or shuts down not to hurt the world map
      */
-    private final Set<BlockInfo.RegeneratingBlock> active = new HashSet<>();
+    private final Set<BlockInfo.RegeneratingBlock> active = ConcurrentHashMap.newKeySet();
 
     /**
      * Stores conditions which must be met to apply custom mining
@@ -107,7 +107,7 @@ public class CustomBlockManager extends SpecificProfessionManager {
     public void initialize(BlockInfo.RegeneratingBlock info, boolean scheduleRegen) {
         if (scheduleRegen) {
             active.add(info);
-            Bukkit.getScheduler().runTaskLater(MMOCore.plugin, () -> regen(info, false), info.getRegeneratingBlock().getRegenerationInfo().getTime());
+            Tasks.runAtLater(info.getLocation(), () -> regen(info, false), info.getRegeneratingBlock().getRegenerationInfo().getTime());
         }
 
         if (info.getRegeneratingBlock().getRegenerationInfo().hasTemporaryBlock())
@@ -125,12 +125,16 @@ public class CustomBlockManager extends SpecificProfessionManager {
      */
     private void regen(BlockInfo.RegeneratingBlock info, boolean shutdown) {
 
-        // Get the chunk and load it async if needed.
-        PaperLib.getChunkAtAsync(info.getLocation()).whenComplete((chunk, ex) -> {
-            info.getRegeneratingBlock().getBlock().regenerate(info);
-            info.getLocation().getBlock().getState().update();
-            if (!shutdown)
-                active.remove(info);
+        Location loc = info.getLocation();
+        if (loc.getWorld() == null) return;
+        loc.getWorld().getChunkAtAsync(loc).whenComplete((chunk, ex) -> {
+            if (ex != null || chunk == null) return;
+            Tasks.executeAt(loc, () -> {
+                info.getRegeneratingBlock().getBlock().regenerate(info);
+                info.getLocation().getBlock().getState().update();
+                if (!shutdown)
+                    active.remove(info);
+            });
         });
     }
 

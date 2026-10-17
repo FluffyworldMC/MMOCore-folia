@@ -7,7 +7,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.experience.dispenser.ExperienceDispenser;
 import net.Indyuce.mmocore.experience.source.type.SpecificExperienceSource;
 import net.Indyuce.mmocore.manager.profession.ExperienceSourceManager;
-import org.bukkit.Bukkit;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -69,7 +69,7 @@ public class CraftItemExperienceSource extends SpecificExperienceSource<Material
             final var itemsCraftedPerRecipe = event.getInventory().getResult().getAmount();
             final var resultType = event.getInventory().getResult().getType();
 
-            Bukkit.getScheduler().runTask(MMOCore.plugin, () -> {
+            Tasks.runEntity((Player) event.getWhoClicked(), () -> {
 
                 final var newItem = event.getInventory().getMatrix()[index];
                 final var newAmount = getEffectiveNewAmount(newItem, oldItem);

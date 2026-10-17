@@ -11,6 +11,7 @@ import net.Indyuce.mmocore.command.Arguments;
 import net.Indyuce.mmocore.manager.InventoryManager;
 import net.Indyuce.mmocore.player.Message;
 import net.Indyuce.mmocore.skilltree.tree.SkillTree;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -41,7 +42,7 @@ public class SkillTreesCommand extends CommandTreeRoot {
 
         // Global skill tree view
         if (opened == null) {
-            InventoryManager.TREE_VIEW.newInventory(data).open();
+            Tasks.openInventory((Player) sender, () -> InventoryManager.TREE_VIEW.newInventory(data));
             return CommandResult.FAILURE;
         }
 
@@ -52,7 +53,7 @@ public class SkillTreesCommand extends CommandTreeRoot {
             return CommandResult.FAILURE;
         }
 
-        InventoryManager.SPECIFIC_TREE_VIEW.get(UtilityMethods.kebabCase(opened.getId())).newInventory(data).open();
+        Tasks.openInventory((Player) sender, () -> InventoryManager.SPECIFIC_TREE_VIEW.get(UtilityMethods.kebabCase(opened.getId())).newInventory(data));
         return CommandResult.SUCCESS;
     }
 }

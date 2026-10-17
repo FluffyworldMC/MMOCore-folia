@@ -1,9 +1,8 @@
 package net.Indyuce.mmocore.api.quest.trigger;
 
 import io.lumine.mythic.lib.api.MMOLineConfig;
-import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.player.PlayerData;
-import org.bukkit.Bukkit;
+import net.Indyuce.mmocore.util.Tasks;
 
 public abstract class Trigger {
 
@@ -25,8 +24,10 @@ public abstract class Trigger {
 	public void schedule(PlayerData player) {
 		if (delay <= 0)
 			apply(player);
+		else if (player.isOnline())
+			Tasks.runEntityLater(player.getPlayer(), () -> apply(player), delay);
 		else
-			Bukkit.getScheduler().scheduleSyncDelayedTask(MMOCore.plugin, () -> apply(player), delay);
+			Tasks.runGlobalLater(() -> apply(player), delay);
 	}
 
 	/**

@@ -1,13 +1,12 @@
 package net.Indyuce.mmocore.loot.chest.particle;
 
 import io.lumine.mythic.lib.version.VParticle;
-import net.Indyuce.mmocore.MMOCore;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Color;
 import org.bukkit.entity.ThrownPotion;
 import org.bukkit.inventory.meta.PotionMeta;
-import org.bukkit.scheduler.BukkitRunnable;
 
-public class PotionParticles extends BukkitRunnable {
+public class PotionParticles {
 	private double r, g, b;
 	private final ThrownPotion potion;
 	private boolean valid = true;
@@ -28,21 +27,18 @@ public class PotionParticles extends BukkitRunnable {
 	}
 
 	public void start() {
-		if (valid)
-			runTaskTimer(MMOCore.plugin, 0, 1);
+		if (!valid) return;
+		Tasks.runEntityTimer(potion, task -> {
+			if (potion.isDead()) {
+				task.cancel();
+				return;
+			}
+
+			potion.getWorld().spawnParticle(VParticle.ENTITY_EFFECT.get(), potion.getLocation(), 0, r, g, b);
+		}, 1, 1);
 	}
 
 	private double ratio(int l) {
 		return (double) l / 255.;
-	}
-
-	@Override
-	public void run() {
-		if (potion == null || potion.isDead()) {
-			cancel();
-			return;
-		}
-
-		potion.getWorld().spawnParticle(VParticle.ENTITY_EFFECT.get(), potion.getLocation(), 0, r, g, b);
 	}
 }

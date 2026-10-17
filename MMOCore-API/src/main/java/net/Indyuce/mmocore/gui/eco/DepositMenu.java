@@ -1,11 +1,13 @@
 package net.Indyuce.mmocore.gui.eco;
 
 import io.lumine.mythic.lib.api.item.NBTItem;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import io.lumine.mythic.lib.gui.PluginInventory;
 import io.lumine.mythic.lib.util.SmartGive;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import net.Indyuce.mmocore.util.item.SimpleItemBuilder;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -13,7 +15,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class DepositMenu extends PluginInventory {
     private ItemStack depositItem;
@@ -27,7 +28,7 @@ public class DepositMenu extends PluginInventory {
      * then the update is processed. If another item is clicked within
      * this delay the task is cancelled and scheduled for later
      */
-    private BukkitRunnable updateRunnable;
+    private ScheduledTask updateTask;
 
     public DepositMenu(Player player) {
         super(player);
@@ -67,9 +68,7 @@ public class DepositMenu extends PluginInventory {
     @Override
     public void onClose() {
 
-        // Cancel runnable
-        if (updateRunnable != null)
-            updateRunnable.cancel();
+        Tasks.cancel(updateTask);
 
         // Give all items back
         var smart = new SmartGive(player);
@@ -81,24 +80,18 @@ public class DepositMenu extends PluginInventory {
     }
 
     private void scheduleUpdate(Inventory inv) {
-        if (updateRunnable != null)
-            updateRunnable.cancel();
+        Tasks.cancel(updateTask);
 
-        updateRunnable = new BukkitRunnable() {
-
-            @Override
-            public void run() {
-                updateRunnable = null;
-                updateDeposit(inv);
-            }
-        };
-        updateRunnable.runTaskLater(MMOCore.plugin, 10);
+        updateTask = Tasks.runEntityLater(player, () -> {
+            updateTask = null;
+            updateDeposit(inv);
+        }, 10);
     }
 
     private void updateDeposit(Inventory inv) {
-        if (updateRunnable != null) {
-            updateRunnable.cancel();
-            updateRunnable = null;
+        if (updateTask != null) {
+            Tasks.cancel(updateTask);
+            updateTask = null;
         }
 
         deposit = MMOCoreUtils.getWorth(inv.getContents());

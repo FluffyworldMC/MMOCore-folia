@@ -8,6 +8,7 @@ depend: [ MythicLib ]
 # Multiverse-Core otherwise waypoint problem
 softdepend: [ Vault,MythicMobs,MMOProfiles,PlaceholderAPI,Residence,Citizens,ProtocolLib,OBTeam,FactionsBridge,Multiverse-Core ]
 api-version: 1.14
+folia-supported: true
 website: www.phoenixdevt.fr
 commands:
   mmocore:

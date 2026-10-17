@@ -17,6 +17,7 @@ import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.event.MMOCommandEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.util.Icon;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -141,8 +142,10 @@ public class MMOCoreUtils {
      * @param message Message to display
      */
     public static void displayIndicator(Location loc, String message) {
-        Hologram holo = Hologram.create(loc, MythicLib.plugin.parseColors(Collections.singletonList(message)));
-        Bukkit.getScheduler().runTaskLater(MMOCore.plugin, holo::despawn, 20);
+        Tasks.executeAt(loc, () -> {
+            Hologram holo = Hologram.create(loc, MythicLib.plugin.parseColors(Collections.singletonList(message)));
+            Tasks.runAtLater(loc, holo::despawn, 20);
+        });
     }
 
     public static boolean isPlayerHead(Material material) {

@@ -7,6 +7,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.command.Arguments;
 import net.Indyuce.mmocore.gui.eco.DepositMenu;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -28,7 +29,7 @@ public class DepositCommand extends CommandTreeRoot {
 
         if (MMOCoreUtils.callLegacyCommandEvent(PlayerData.get(player), this)) return CommandResult.FAILURE;
 
-        new DepositMenu(player).open();
+        Tasks.openInventory(player, () -> new DepositMenu(player));
         return CommandResult.SUCCESS;
     }
 

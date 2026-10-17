@@ -14,6 +14,7 @@ import net.Indyuce.mmocore.manager.InventoryManager;
 import net.Indyuce.mmocore.party.provided.MMOCorePartyModule;
 import net.Indyuce.mmocore.party.provided.PartyInvite;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -44,8 +45,10 @@ public class PartyCommand extends CommandTreeRoot {
 
         // Open inventory
         if (action == null) {
-            if (playerData.getParty() != null) InventoryManager.PARTY_VIEW.newInventory(playerData).open();
-            else InventoryManager.PARTY_CREATION.newInventory(playerData).open();
+            final var player = (Player) sender;
+            Tasks.openInventory(player, () -> playerData.getParty() != null
+                    ? InventoryManager.PARTY_VIEW.newInventory(playerData)
+                    : InventoryManager.PARTY_CREATION.newInventory(playerData));
             return CommandResult.SUCCESS;
         }
 

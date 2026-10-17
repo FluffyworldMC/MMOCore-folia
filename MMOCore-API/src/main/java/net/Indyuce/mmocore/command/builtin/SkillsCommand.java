@@ -8,6 +8,7 @@ import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.command.Arguments;
 import net.Indyuce.mmocore.manager.InventoryManager;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -35,7 +36,7 @@ public class SkillsCommand extends CommandTreeRoot {
             return CommandResult.FAILURE;
         }
 
-        InventoryManager.SKILL_LIST.newInventory(playerData).open();
+        Tasks.openInventory(player, () -> InventoryManager.SKILL_LIST.newInventory(playerData));
         return CommandResult.SUCCESS;
     }
 }

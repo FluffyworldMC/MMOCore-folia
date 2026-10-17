@@ -7,6 +7,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.command.Arguments;
 import net.Indyuce.mmocore.manager.InventoryManager;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -29,10 +30,12 @@ public class ClassCommand extends CommandTreeRoot {
         final var playerData = PlayerData.get(player);
         if (MMOCoreUtils.callLegacyCommandEvent(playerData, this)) return CommandResult.FAILURE;
 
-        // Main class or subclass
-        if (playerData.getProfess().getSubclasses().stream().anyMatch(sub -> sub.getLevel() <= playerData.getLevel()))
-            InventoryManager.SUBCLASS_SELECT.newInventory(playerData).open();
-        else InventoryManager.CLASS_SELECT.newInventory(playerData).open();
+        Tasks.openInventory(player, () -> {
+            // Main class or subclass
+            if (playerData.getProfess().getSubclasses().stream().anyMatch(sub -> sub.getLevel() <= playerData.getLevel()))
+                return InventoryManager.SUBCLASS_SELECT.newInventory(playerData);
+            else return InventoryManager.CLASS_SELECT.newInventory(playerData);
+        });
 
         return CommandResult.SUCCESS;
     }

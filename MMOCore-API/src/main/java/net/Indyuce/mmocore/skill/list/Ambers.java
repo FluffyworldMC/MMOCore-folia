@@ -11,10 +11,12 @@ import io.lumine.mythic.lib.skill.handler.BuiltinSkillHandler;
 import io.lumine.mythic.lib.skill.handler.SkillHandler;
 import io.lumine.mythic.lib.skill.result.def.SimpleSkillResult;
 import io.lumine.mythic.lib.util.EntityLocationType;
-import io.lumine.mythic.lib.util.ParabolicProjectile;
 import io.lumine.mythic.lib.util.annotation.BackwardsCompatibility;
 import io.lumine.mythic.lib.version.VParticle;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.loot.chest.particle.ParabolicProjectile;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -22,8 +24,8 @@ import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
 
 @BuiltinSkillHandler(mods = {"percent"}, triggerable = false)
@@ -64,12 +66,13 @@ public class Ambers extends SkillHandler<SimpleSkillResult> implements Listener 
         passive.getTriggeredSkill().cast(SkillMetadata.of(event));
     }
 
-    class Amber extends BukkitRunnable {
+    class Amber {
         private final Location loc;
         private final MMOPlayerData data;
         private final double percent;
 
         private int j;
+        private ScheduledTask task;
 
         private static final double RADIUS_SQUARED = 3;
 
@@ -78,32 +81,38 @@ public class Ambers extends SkillHandler<SimpleSkillResult> implements Listener 
             this.data = data;
             this.percent = percent / 100;
 
-            final Amber amber = this;
-            new ParabolicProjectile(source, loc, VParticle.REDSTONE.get(), () -> amber.runTaskTimer(MythicLib.plugin, 0, 3), 1, Color.ORANGE, 1.3f);
+            new ParabolicProjectile(source, loc, VParticle.REDSTONE.get(), this::start, 1, Color.ORANGE, 1.3f);
         }
 
-        @Override
-        public void run() {
-            if (j++ > 66 || !data.isOnline() || !data.getPlayer().getWorld().equals(loc.getWorld())) {
-                cancel();
+        private void start() {
+            task = Tasks.runAtTimer(loc, scheduled -> tick(scheduled), 1, 3);
+        }
+
+        private void tick(ScheduledTask scheduled) {
+            if (j++ > 66 || !data.isOnline()) {
+                scheduled.cancel();
                 return;
             }
 
-            if (data.getPlayer().getLocation().add(0, 1, 0).distanceSquared(loc) < RADIUS_SQUARED) {
+            Player player = data.getPlayer();
+            Tasks.executeEntity(player, () -> {
+                if (!player.getWorld().equals(loc.getWorld())) {
+                    Tasks.cancel(task);
+                    return;
+                }
 
-                data.getPlayer().playSound(data.getPlayer().getLocation(), Sound.BLOCK_END_PORTAL_FRAME_FILL, 1, 1);
+                if (player.getLocation().add(0, 1, 0).distanceSquared(loc) < RADIUS_SQUARED) {
+                    player.playSound(player.getLocation(), Sound.BLOCK_END_PORTAL_FRAME_FILL, 1, 1);
 
-                // Give mana back
-                PlayerData playerData = PlayerData.get(data);
-                double missingMana = data.getStatMap().getStat("MAX_MANA") - playerData.getMana();
-                playerData.giveMana(missingMana * percent, ResourceUpdateReason.SKILL);
+                    PlayerData playerData = PlayerData.get(data);
+                    double missingMana = data.getStatMap().getStat("MAX_MANA") - playerData.getMana();
+                    playerData.giveMana(missingMana * percent, ResourceUpdateReason.SKILL);
 
-                cancel();
-                return;
-            }
+                    Tasks.cancel(task);
+                }
+            });
 
             for (int j = 0; j < 5; j++)
-                // TODO move this sh*t to MythicLib
                 if (legacyParticles)
                     loc.getWorld().spawnParticle(VParticle.ENTITY_EFFECT.get(), loc, 0, 1, 0.647, 0, 1);
                 else

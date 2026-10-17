@@ -3,6 +3,7 @@ package net.Indyuce.mmocore.api.eco;
 import io.lumine.mythic.lib.util.SmartGive;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import net.Indyuce.mmocore.util.item.CurrencyItemBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -38,7 +39,7 @@ public class Withdraw implements Listener {
 
         Message.WITHDRAW_START.send(player);
         Bukkit.getPluginManager().registerEvents(this, MMOCore.plugin);
-        Bukkit.getScheduler().runTaskLater(MMOCore.plugin, this::close, 20 * 20);
+        Tasks.runEntityLater(player, this::close, 20 * 20);
     }
 
     public void close() {
@@ -83,7 +84,7 @@ public class Withdraw implements Listener {
 
         close();
 
-        Bukkit.getScheduler().runTask(MMOCore.plugin, () -> {
+        Tasks.runEntity(player, () -> {
             MMOCore.plugin.economy.getEconomy().withdrawPlayer(player, worth);
             withdrawAlgorithm(worth);
             Message.WITHDRAW_SUCCESS.send(player, "worth", worth);

@@ -7,10 +7,10 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.experience.dispenser.ExperienceDispenser;
 import net.Indyuce.mmocore.experience.source.type.SpecificExperienceSource;
 import net.Indyuce.mmocore.manager.profession.ExperienceSourceManager;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Objects;
 
@@ -67,21 +67,13 @@ public class PlayExperienceSource extends SpecificExperienceSource {
     private static class Manager extends ExperienceSourceManager<PlayExperienceSource> {
 
         public Manager() {
-            new BukkitRunnable() {
-
-                @Override
-                public void run() {
-                    Bukkit.getOnlinePlayers().forEach(player -> {
-                        if (UtilityMethods.isRealPlayer(player)) {
-                            PlayerData playerData = PlayerData.get(player);
-                            for (PlayExperienceSource source : getSources())
-                                if (source.matchesParameter(playerData, null))
-                                   source. giveExperience(playerData, 1, null);
-                        }
-                    });
-                }
-
-            }.runTaskTimer(MMOCore.plugin, 0, 20);
+            Tasks.runForEachPlayer(1, 20, player -> {
+                if (!UtilityMethods.isRealPlayer(player)) return;
+                PlayerData playerData = PlayerData.get(player);
+                for (PlayExperienceSource source : getSources())
+                    if (source.matchesParameter(playerData, null))
+                        source.giveExperience(playerData, 1, null);
+            });
         }
     }
 }

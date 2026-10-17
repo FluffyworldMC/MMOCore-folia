@@ -12,6 +12,7 @@ import net.Indyuce.mmocore.experience.source.MineBlockExperienceSource;
 import net.Indyuce.mmocore.loot.LootBuilder;
 import net.Indyuce.mmocore.loot.chest.condition.ConditionInstance;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -133,7 +134,7 @@ public class BlockListener implements Listener {
          * Finally enable block regen.
          */
         if (info.hasRegen())
-            Bukkit.getScheduler().runTaskLater(MythicLib.plugin, () -> MMOCore.plugin.mineManager.initialize(info.startRegeneration(Bukkit.createBlockData(savedData), block.getLocation()), !temporaryBlock), 1);
+            Tasks.runAtLater(block.getLocation(), () -> MMOCore.plugin.mineManager.initialize(info.startRegeneration(Bukkit.createBlockData(savedData), block.getLocation()), !temporaryBlock), 1);
     }
 
     /**

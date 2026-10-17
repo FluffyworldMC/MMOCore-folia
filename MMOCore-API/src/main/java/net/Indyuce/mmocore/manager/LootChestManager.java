@@ -10,21 +10,21 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LootChestManager implements MMOCoreManager {
 
     /**
      * Active loot chests in the server
      */
-    private final Map<HashableLocation, LootChest> active = new HashMap<>();
+    private final Map<HashableLocation, LootChest> active = new ConcurrentHashMap<>();
 
     /**
      * Registered loot chest regions
      */
-    private final Map<String, LootChestRegion> regions = new HashMap<>();
+    private final Map<String, LootChestRegion> regions = new ConcurrentHashMap<>();
 
     public boolean hasRegion(String id) {
         return regions.containsKey(id);

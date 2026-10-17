@@ -7,7 +7,7 @@ import net.Indyuce.mmocore.experience.EXPSource;
 import net.Indyuce.mmocore.experience.dispenser.ExperienceDispenser;
 import net.Indyuce.mmocore.experience.source.type.ExperienceSource;
 import net.Indyuce.mmocore.manager.profession.ExperienceSourceManager;
-import org.bukkit.Bukkit;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -57,15 +57,20 @@ public class BrewPotionExperienceSource extends ExperienceSource<PotionMeta> {
 
             final ItemStack found = findPotion(event.getContents());
             if (found != null)
-                Bukkit.getScheduler().scheduleSyncDelayedTask(MMOCore.plugin, () -> {
+                Tasks.runAt(event.getBlock().getLocation(), () -> {
                     ItemStack brewn = findPotion(event.getContents());
                     if (brewn == null)
                         return;
 
-                    PlayerData data = PlayerData.get(playerOpt.get());
-                    for (BrewPotionExperienceSource source : getSources())
-                        if (source.matches(data, (PotionMeta) brewn.getItemMeta()))
-                            new PotionUpgrade(found, brewn).process(source, data.getPlayer());
+                    Player player = playerOpt.get();
+                    PotionMeta brewnMeta = (PotionMeta) brewn.getItemMeta();
+                    PotionUpgrade upgrade = new PotionUpgrade(found, brewn);
+                    Tasks.executeEntity(player, () -> {
+                        PlayerData data = PlayerData.get(player);
+                        for (BrewPotionExperienceSource source : getSources())
+                            if (source.matches(data, brewnMeta))
+                                upgrade.process(source, player);
+                    });
                 });
         }
 

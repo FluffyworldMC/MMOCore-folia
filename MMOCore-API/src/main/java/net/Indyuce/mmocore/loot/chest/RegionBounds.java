@@ -38,6 +38,10 @@ public class RegionBounds {
 		z2 = Math.max(loc1.getBlockZ(), loc2.getBlockZ());
 	}
 
+	public World getWorld() {
+		return world;
+	}
+
 	public Stream<PlayerData> getPlayers() {
 		return world.getPlayers().stream().filter(this::isInRegion).map(PlayerData::get);
 	}

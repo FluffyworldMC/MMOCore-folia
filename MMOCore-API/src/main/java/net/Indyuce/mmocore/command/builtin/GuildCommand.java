@@ -14,6 +14,7 @@ import net.Indyuce.mmocore.guild.provided.GuildInvite;
 import net.Indyuce.mmocore.guild.provided.MMOCoreGuildModule;
 import net.Indyuce.mmocore.manager.InventoryManager;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -43,8 +44,10 @@ public class GuildCommand extends CommandTreeRoot {
 
         // Open guild inventory/creation
         if (action == null) {
-            if (playerData.inGuild()) InventoryManager.GUILD_VIEW.newInventory(playerData).open();
-            else InventoryManager.GUILD_CREATION.newInventory(playerData).open();
+            final var player = (Player) sender;
+            Tasks.openInventory(player, () -> playerData.inGuild()
+                    ? InventoryManager.GUILD_VIEW.newInventory(playerData)
+                    : InventoryManager.GUILD_CREATION.newInventory(playerData));
             return CommandResult.SUCCESS;
         }
 

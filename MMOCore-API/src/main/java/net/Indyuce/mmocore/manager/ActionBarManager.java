@@ -5,16 +5,17 @@ import io.lumine.mythic.lib.gui.editable.placeholder.Placeholders;
 import io.lumine.mythic.lib.manager.StatManager;
 import io.lumine.mythic.lib.message.actionbar.ActionBarPriority;
 import io.lumine.mythic.lib.version.Attributes;
-import net.Indyuce.mmocore.MMOCore;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.entity.Player;
 
-// TODO extends Manager and not bukkit runnable for clarity.
-public class ActionBarManager extends BukkitRunnable {
+public class ActionBarManager {
     private int updateTicks;
     private String barFormat;
     private boolean enabled, scheduled;
+    private ScheduledTask task;
 
     public static final int PRIORITY = ActionBarPriority.LOWEST;
 
@@ -24,27 +25,24 @@ public class ActionBarManager extends BukkitRunnable {
         barFormat = config.getString("format", "<No Action Bar Format Found>");
 
         if (!scheduled && enabled) {
-            runTaskTimer(MMOCore.plugin, 0, updateTicks);
+            task = Tasks.runForEachPlayer(1, Math.max(1, updateTicks), this::tickPlayer);
             scheduled = true;
         } else if (scheduled && !enabled) {
-            cancel();
+            Tasks.cancel(task);
+            task = null;
             scheduled = false;
         }
     }
 
-    @Override
-    public void run() {
-        for (var player : PlayerData.getAll()) {
+    private void tickPlayer(Player bukkitPlayer) {
+        PlayerData player = PlayerData.get(bukkitPlayer);
+        if (bukkitPlayer.isDead() || !player.getMMOPlayerData().isPlaying()) return;
 
-            // Basic checks
-            if (!player.isOnline() || player.getPlayer().isDead() || !player.getMMOPlayerData().isPlaying()) continue;
-
-            player.getMMOPlayerData().getActionBar().show(PRIORITY, () -> {
-                var placeholders = getActionBarPlaceholders(player);
-                var rawMessage = player.getProfess().hasActionBar() ? player.getProfess().getActionBar() : barFormat;
-                return placeholders.apply(player.getPlayer(), rawMessage);
-            });
-        }
+        player.getMMOPlayerData().getActionBar().show(PRIORITY, () -> {
+            var placeholders = getActionBarPlaceholders(player);
+            var rawMessage = player.getProfess().hasActionBar() ? player.getProfess().getActionBar() : barFormat;
+            return placeholders.apply(bukkitPlayer, rawMessage);
+        });
     }
 
     public Placeholders getActionBarPlaceholders(PlayerData data) {

@@ -7,6 +7,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.command.Arguments;
 import net.Indyuce.mmocore.manager.InventoryManager;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -29,7 +30,7 @@ public class AttributesCommand extends CommandTreeRoot {
         final var playerData = PlayerData.get(player);
         if (MMOCoreUtils.callLegacyCommandEvent(playerData, this)) return CommandResult.FAILURE;
 
-        InventoryManager.ATTRIBUTE_VIEW.newInventory(playerData).open();
+        Tasks.openInventory(player, () -> InventoryManager.ATTRIBUTE_VIEW.newInventory(playerData));
         return CommandResult.SUCCESS;
     }
 }

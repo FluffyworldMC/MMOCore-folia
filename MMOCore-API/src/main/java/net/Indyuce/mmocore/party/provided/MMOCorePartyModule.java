@@ -7,6 +7,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.party.AbstractParty;
 import net.Indyuce.mmocore.party.PartyModule;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import net.Indyuce.mmocore.util.Language;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
@@ -70,14 +71,18 @@ public class MMOCorePartyModule implements PartyModule, Listener {
 
         event.setCancelled(true);
 
-        // Run it on main server thread
-        Bukkit.getScheduler().runTask(MMOCore.plugin, () -> {
+        Tasks.runEntity(event.getPlayer(), () -> {
             final var rawMessage = event.getMessage().substring(prefix.length());
             final var called = new PartyChatEvent(party, data, rawMessage);
             Bukkit.getPluginManager().callEvent(called);
             if (called.isCancelled() || called.getMessage() == null) return;
 
-            party.getOnlineMembers().forEach(member -> Message.PARTY_CHAT.send(member.getPlayer(), "player", data.getPlayer().getName(), "message", called.getMessage()));
+            String name = data.getPlayer().getName();
+            String message = called.getMessage();
+            party.getOnlineMembers().forEach(member -> {
+                if (!member.isOnline()) return;
+                Tasks.executeEntity(member.getPlayer(), () -> Message.PARTY_CHAT.send(member.getPlayer(), "player", name, "message", message));
+            });
         });
     }
 

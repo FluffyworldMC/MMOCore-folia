@@ -4,6 +4,7 @@ import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.event.social.GuildChatEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.player.Message;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -22,17 +23,19 @@ public class GuildListener implements Listener {
 
         event.setCancelled(true);
 
-        // Run it on main server thread
-        Bukkit.getScheduler().runTask(MMOCore.plugin, () -> {
+        Tasks.runEntity(event.getPlayer(), () -> {
             final var rawMessage = event.getMessage().substring(MMOCore.plugin.nativeGuildManager.getConfig().getPrefix().length());
             final var called = new GuildChatEvent(data, rawMessage);
             Bukkit.getPluginManager().callEvent(called);
             if (called.isCancelled() || called.getMessage() == null) return;
 
+            String name = data.getPlayer().getName();
+            String tag = data.getGuild().getTag();
+            String message = called.getMessage();
             data.getGuild().forEachMember(member -> {
                 Player online = Bukkit.getPlayer(member);
                 if (online != null)
-                    Message.GUILD_CHAT.send(online, "player", data.getPlayer().getName(), "tag", data.getGuild().getTag(), "message", called.getMessage());
+                    Tasks.executeEntity(online, () -> Message.GUILD_CHAT.send(online, "player", name, "tag", tag, "message", message));
             });
         });
     }

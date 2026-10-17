@@ -10,10 +10,10 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.experience.dispenser.ExperienceDispenser;
 import net.Indyuce.mmocore.experience.source.type.SpecificExperienceSource;
 import net.Indyuce.mmocore.manager.profession.ExperienceSourceManager;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -66,17 +66,12 @@ public class DamageTakenExperienceSource extends SpecificExperienceSource<Entity
                 return Math.min(eventDamage, maxHealth);
             });
 
-            // Wait 2 tick to check if the player died
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    for (DamageTakenExperienceSource source : getSources())
-                        if (source.matchesParameter(playerData, event.getCause())) {
-                            //  System.out.println("-> " + effectiveDamage.get());
-                            source.giveExperience(playerData, effectiveDamage.get(), null);
-                        }
-                }
-            }.runTaskLater(MMOCore.plugin, 2);
+            // Wait 2 ticks to check if the player died. Stay on the player's region.
+            Tasks.runEntityLater((Player) event.getEntity(), () -> {
+                for (DamageTakenExperienceSource source : getSources())
+                    if (source.matchesParameter(playerData, event.getCause()))
+                        source.giveExperience(playerData, effectiveDamage.get(), null);
+            }, 2);
         }
     }
 }

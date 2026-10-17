@@ -4,20 +4,20 @@ import io.lumine.mythic.lib.util.lang3.Validate;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.profess.resource.PlayerResource;
-import org.bukkit.scheduler.BukkitRunnable;
+import net.Indyuce.mmocore.util.Tasks;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-public class ResourceRegenRunnable extends BukkitRunnable {
+public class ResourceRegenRunnable {
 
     private boolean scheduled = false;
     private double tickPeriodMultiplier;
 
-    @Override
-    public void run() {
-        for (var player : PlayerData.getAll())
-            // Check if the player is dead, otherwise
-            // will cause glitches in the respawn menu
-            if (player.getMMOPlayerData().isPlaying() && !player.getPlayer().isDead()) tickResourceRegen(player);
+    private void tickOnline(Player player) {
+        PlayerData data = PlayerData.get(player);
+        // Check if the player is dead, otherwise
+        // will cause glitches in the respawn menu
+        if (data.getMMOPlayerData().isPlaying() && !player.isDead()) tickResourceRegen(data);
     }
 
     void tickResourceRegen(@NotNull PlayerData player) {
@@ -35,6 +35,6 @@ public class ResourceRegenRunnable extends BukkitRunnable {
 
         final var tickPeriod = Math.max(1, MMOCore.plugin.getConfig().getLong("player_resource_tick_period"));
         this.tickPeriodMultiplier = (double) tickPeriod / 20d;
-        this.runTaskTimer(MMOCore.plugin, tickPeriod, tickPeriod);
+        Tasks.runForEachPlayer(tickPeriod, tickPeriod, this::tickOnline);
     }
 }

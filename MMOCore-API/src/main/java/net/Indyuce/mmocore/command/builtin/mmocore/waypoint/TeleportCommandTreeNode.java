@@ -25,7 +25,7 @@ public class TeleportCommandTreeNode extends CommandTreeNode {
         Waypoint waypoint = explorer.parse(argWaypoint);
         Player player = explorer.parse(argPlayer);
 
-        player.teleport(waypoint.getLocation());
+        player.teleportAsync(waypoint.getLocation());
         return explorer.success("Successfully teleported &6" + player.getName() + "&e to &6" + waypoint.getId());
     }
 }

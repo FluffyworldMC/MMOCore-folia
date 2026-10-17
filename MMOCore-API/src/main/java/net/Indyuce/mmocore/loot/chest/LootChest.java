@@ -1,9 +1,11 @@
 package net.Indyuce.mmocore.loot.chest;
 
 import io.lumine.mythic.lib.util.lang3.Validate;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.player.Message;
 import net.Indyuce.mmocore.util.HashableLocation;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -13,7 +15,6 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 public class LootChest {
@@ -21,8 +22,8 @@ public class LootChest {
     private final LootChestRegion region;
     private final ReplacedBlock block;
     @Nullable
-    private final BukkitRunnable effectRunnable;
-    private final BukkitRunnable closeRunnable;
+    private final ScheduledTask effectTask;
+    private final ScheduledTask closeTask;
 
     private boolean active = true;
 
@@ -37,14 +38,8 @@ public class LootChest {
         this.tier = tier;
         this.region = region;
         this.block = new ReplacedBlock(block);
-        this.effectRunnable = tier.hasEffect() ? tier.getEffect().startNewRunnable(block.getLocation().add(.5, .5, .5)) : null;
-        closeRunnable = new BukkitRunnable() {
-            @Override
-            public void run() {
-                expire(null);
-            }
-        };
-        closeRunnable.runTaskLater(MMOCore.plugin, MMOCore.plugin.configManager.lootChestExpireTime);
+        this.effectTask = tier.hasEffect() ? tier.getEffect().startNewRunnable(block.getLocation().add(.5, .5, .5)) : null;
+        closeTask = Tasks.runAtLater(block.getLocation(), () -> expire(null), MMOCore.plugin.configManager.lootChestExpireTime);
     }
 
     public ChestTier getTier() {
@@ -73,20 +68,18 @@ public class LootChest {
      */
     public void expire(@Nullable Player player) {
 
-        // Check for expire
-        Validate.isTrue(active, "Chest has already expired");
-        active = false;
+        synchronized (this) {
+            Validate.isTrue(active, "Chest has already expired");
+            active = false;
+        }
 
-        // Close runnable
-        if (!closeRunnable.isCancelled())
-            closeRunnable.cancel();
+        Tasks.cancel(closeTask);
+        Tasks.executeAt(block.loc.bukkit(), () -> finishExpire(player));
+    }
 
-        /*
-         * If a player is responsible of closing the chest, play the
-         * closing sound and drop its content before clearing it
-         */
+    private void finishExpire(@Nullable Player player) {
         if (player != null) {
-            Message.CLOSE_LOOT_CHEST.send(player);
+            Tasks.executeEntity(player, () -> Message.CLOSE_LOOT_CHEST.send(player));
             block.loc.getWorld().spawnParticle(Particle.CRIT, block.loc.bukkit().add(.5, .5, .5), 16, 0, 0, 0, .5);
 
             final Inventory chestInv = ((Chest) block.loc.bukkit().getBlock().getState()).getBlockInventory();
@@ -104,8 +97,7 @@ public class LootChest {
          */
 
         block.restore();
-        if (effectRunnable != null)
-            effectRunnable.cancel();
+        Tasks.cancel(effectTask);
     }
 
     public static class ReplacedBlock {
