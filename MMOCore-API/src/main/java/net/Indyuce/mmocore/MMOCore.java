@@ -17,6 +17,7 @@ import net.Indyuce.mmocore.comp.citizens.CitizensMMOLoader;
 import net.Indyuce.mmocore.comp.mythicmobs.MythicHook;
 import net.Indyuce.mmocore.comp.mythicmobs.MythicMobsMMOLoader;
 import net.Indyuce.mmocore.comp.placeholder.MMOCorePlaceholderExpansion;
+import net.Indyuce.mmocore.comp.placeholder.ClassPlaceholders;
 import net.Indyuce.mmocore.comp.region.DefaultRegionHandler;
 import net.Indyuce.mmocore.comp.region.RegionHandler;
 import net.Indyuce.mmocore.comp.region.WorldGuardMMOLoader;
@@ -86,6 +87,7 @@ public class MMOCore extends MMOPlugin {
     public final StatManager statManager = new StatManager();
     public final GuildDataManager nativeGuildManager = new YAMLGuildDataManager();
     public final PlayerDataManager playerDataManager = new PlayerDataManager(this);
+    public final ClassPlaceholders classPlaceholders = new ClassPlaceholders();
     @Deprecated
     public final DataProvider dataProvider = new LegacyDataProvider();
 
@@ -247,6 +249,9 @@ public class MMOCore extends MMOPlugin {
          * recognize what profess the player has and professes will be lost
          */
         playerDataManager.initialize(EventPriority.LOW, EventPriority.NORMAL);
+        if (playerDataManager.getDatabase() instanceof SQLDatabaseImpl)
+            ((SQLDatabaseImpl) playerDataManager.getDatabase()).startLiveSync();
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) classPlaceholders.start();
 
         // load guild data after loading player data
         nativeGuildManager.load();
@@ -263,6 +268,7 @@ public class MMOCore extends MMOPlugin {
             nativeGuildManager.save(guild);
 
         // Close player data manager
+        classPlaceholders.close();
         playerDataManager.close();
 
         // Reset active blocks

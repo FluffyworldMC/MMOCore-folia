@@ -8,12 +8,9 @@ import io.lumine.mythic.lib.data.sql.UpdateRequestBuilder;
 import io.lumine.mythic.lib.gson.JsonArray;
 import io.lumine.mythic.lib.gson.JsonElement;
 import io.lumine.mythic.lib.gson.JsonObject;
-import io.lumine.mythic.lib.util.lang3.Validate;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.api.event.PlayerLevelChangeEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
-import net.Indyuce.mmocore.api.player.profess.PlayerClass;
-import net.Indyuce.mmocore.api.player.profess.SavedClassInformation;
 import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.guild.provided.Guild;
 import net.Indyuce.mmocore.manager.data.OfflinePlayerData;
@@ -29,16 +26,17 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Level;
 
 public class SQLDatabaseImpl extends SQLDatabase<PlayerData, OfflinePlayerData> {
     public static final String UUID_FIELD_NAME = "uuid";
+    private final SQLClassData classData = new SQLClassData(this);
 
     public SQLDatabaseImpl() {
         super(MMOCore.plugin, UUID_FIELD_NAME);
     }
 
     private static final String[] NEW_COLUMNS = new String[]{
+            "classes_migrated", "TINYINT DEFAULT 0",
             "times_claimed", "LONGTEXT",
             "is_saved", "TINYINT",
             "skill_reallocation_points", "INT(11)",
@@ -50,6 +48,16 @@ public class SQLDatabaseImpl extends SQLDatabase<PlayerData, OfflinePlayerData> 
             "mana", "FLOAT",
             "stamina", "FLOAT",
             "stellium", "FLOAT"};
+
+    @Override
+    public void setup() {
+        try {
+            setupSQL();
+        } catch (SQLException exception) {
+            // Continuing with a partial migration could discard inactive legacy classes.
+            throw new IllegalStateException("Could not initialize MMOCore SQL class storage", exception);
+        }
+    }
 
     @Override
     protected void setupSQL() throws SQLException {
@@ -90,14 +98,16 @@ public class SQLDatabaseImpl extends SQLDatabase<PlayerData, OfflinePlayerData> 
         for (int i = 0; i < NEW_COLUMNS.length; i += 2) {
             final var columnName = NEW_COLUMNS[i];
             final var dataType = NEW_COLUMNS[i + 1];
+            final boolean[] exists = {false};
             executeQuery("SELECT * FROM `information_schema`.`COLUMNS` WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?", result -> {
-                if (!result.next())
-                    executeUpdate("ALTER TABLE " + userdataTableName + " ADD COLUMN " + columnName + " " + dataType);
+                exists[0] = result.next();
             }, databaseName, userdataTableName, columnName);
+            if (!exists[0]) executeUpdate("ALTER TABLE " + userdataTableName + " ADD COLUMN " + columnName + " " + dataType);
         }
 
         // Modify exp to be a double precision instead
         executeUpdate("ALTER TABLE `" + userdataTableName + "` MODIFY COLUMN experience DOUBLE PRECISION");
+        classData.setup();
     }
 
     @Override
@@ -174,24 +184,13 @@ public class SQLDatabaseImpl extends SQLDatabase<PlayerData, OfflinePlayerData> 
                 if (skill != null) playerData.bindSkill(Integer.parseInt(entry.getKey()), skill);
             }
         }
-        if (!isEmpty(result.getString("class_info"))) {
-            JsonObject object = MythicLib.plugin.getGson().fromJson(result.getString("class_info"), JsonObject.class);
-            for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
-                try {
-                    PlayerClass profess = MMOCore.plugin.classManager.get(entry.getKey());
-                    Validate.notNull(profess, "Could not find class '" + entry.getKey() + "'");
-                    playerData.applyClassInfo(profess, new SavedClassInformation(entry.getValue().getAsJsonObject()));
-                } catch (IllegalArgumentException exception) {
-                    MMOCore.log(Level.WARNING, "Could not load class info '" + entry.getKey() + "': " + exception.getMessage());
-                }
-            }
-        }
 
         /*
          * These should be loaded after to make sure that the
          * MAX_MANA, MAX_STAMINA & MAX_STELLIUM stats are already loaded.
          */
         playerData.loadResources(result.getDouble("health"), result.getDouble("mana"), result.getDouble("stamina"), result.getDouble("stellium"));
+        classData.load(playerData, result.getStatement().getConnection());
 
         UtilityMethods.debug(MMOCore.plugin, "SQL", String.format("{ class: %s, level: %d }", playerData.getProfess().getId(), playerData.getLevel()));
         return new DataLoadResult(false, force);
@@ -199,6 +198,7 @@ public class SQLDatabaseImpl extends SQLDatabase<PlayerData, OfflinePlayerData> 
 
     @Override
     protected void setupSaveRequest(@NotNull PlayerData playerData, @NotNull UpdateRequestBuilder<PlayerData> builder) {
+        builder.appendInt("classes_migrated", 1);
         builder.appendInt("class_points", playerData.getClassPoints());
         builder.appendInt("skill_points", playerData.getSkillPoints());
         builder.appendInt("skill_reallocation_points", playerData.getSkillReallocationPoints());
@@ -224,64 +224,35 @@ public class SQLDatabaseImpl extends SQLDatabase<PlayerData, OfflinePlayerData> 
         builder.appendString("attributes", playerData.getAttributes().toJson().toString());
         builder.appendString("professions", playerData.getCollectionSkills().toJsonString());
         builder.appendString("quests", playerData.getQuestData().toJsonString());
-        builder.appendString("class_info", createClassInfoData(playerData).toString());
         builder.appendCollection("unlocked_items", playerData.getUnlockedItems());
 
         UtilityMethods.debug(MMOCore.plugin, "SQL", String.format("{ class: %s, level: %d }", playerData.getProfess().getId(), playerData.getLevel()));
     }
 
-    private JsonObject createClassInfoData(PlayerData playerData) {
-        final JsonObject json = new JsonObject();
-        for (String c : playerData.getSavedClasses()) {
-            final SavedClassInformation info = playerData.getClassInfo(c);
-            JsonObject classinfo = new JsonObject();
-            classinfo.addProperty("level", info.getLevel());
-            classinfo.addProperty("experience", info.getExperience());
-            classinfo.addProperty("skill-points", info.getSkillPoints());
-            classinfo.addProperty("attribute-points", info.getAttributePoints());
-            classinfo.addProperty("attribute-realloc-points", info.getAttributeReallocationPoints());
-            classinfo.addProperty("skill-reallocation-points", info.getSkillReallocationPoints());
-            classinfo.addProperty("skill-tree-reallocation-points", info.getSkillTreeReallocationPoints());
-            classinfo.addProperty("health", info.getLastHealth());
-            classinfo.addProperty("mana", info.getMana());
-            classinfo.addProperty("stamina", info.getStamina());
-            classinfo.addProperty("stellium", info.getStellium());
+    public void startLiveSync() {
+        classData.start();
+    }
 
-            JsonArray array = new JsonArray();
-            for (String unlockedItem : playerData.getUnlockedItems()) {
-                array.add(unlockedItem);
-            }
-            classinfo.add("unlocked-items", array);
+    public java.util.List<net.Indyuce.mmocore.comp.placeholder.ClassRanking.Entry> getClassLeaderboard(String classId, int limit) throws SQLException {
+        return classData.leaderboard(classId, limit);
+    }
 
-            JsonObject skillinfo = new JsonObject();
-            for (String skill : info.getSkillKeys())
-                skillinfo.addProperty(skill, info.getSkillLevel(skill));
-            classinfo.add("skill", skillinfo);
-
-            JsonObject attributeInfo = new JsonObject();
-            for (String attribute : info.getAttributeKeys())
-                attributeInfo.addProperty(attribute, info.getAttributeLevel(attribute));
-            classinfo.add("attribute", attributeInfo);
-
-            JsonObject nodeLevelsInfo = new JsonObject();
-            for (String node : info.getNodeKeys())
-                nodeLevelsInfo.addProperty(node, info.getNodeLevel(node));
-            classinfo.add("node-levels", nodeLevelsInfo);
-
-            JsonObject skillTreePointsInfo = new JsonObject();
-            for (String skillTreeId : info.getSkillTreePointsKeys())
-                skillTreePointsInfo.addProperty(skillTreeId, info.getSkillTreePoints(skillTreeId));
-            classinfo.add("skill-tree-points", skillTreePointsInfo);
-
-            JsonObject boundSkillInfo = new JsonObject();
-            for (int slot : info.mapBoundSkills().keySet())
-                boundSkillInfo.addProperty(String.valueOf(slot), info.mapBoundSkills().get(slot));
-            classinfo.add("bound-skills", boundSkillInfo);
-
-            json.add(c, classinfo);
+    @Override
+    public void saveData(PlayerData playerData, io.lumine.mythic.lib.profile.SessionUpdateReason reason) {
+        try {
+            // Save class rows before releasing the cross-server session in the main table.
+            classData.save(playerData);
+            super.saveData(playerData, reason);
+            if (reason != io.lumine.mythic.lib.profile.SessionUpdateReason.AUTOSAVE) classData.forget(playerData);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not save class progression for " + playerData.getEffectiveId(), exception);
         }
+    }
 
-        return json;
+    @Override
+    public void close() {
+        classData.close();
+        super.close();
     }
 
     private boolean isEmpty(@Nullable String str) {

@@ -28,6 +28,16 @@ mysql:
 
   userdata-table-name: 'mmocore_playerdata'
 
+  # One row per UUID/class in <userdata-table-name>_classes. Class progress is independent.
+  # External edits appear online after approximately this many seconds.
+  live-sync: true
+  live-sync-interval: 1
+
+# Class placeholders use memory snapshots, never SQL per placeholder request.
+class-placeholders:
+  top-size: 100
+  top-refresh-interval: 60 # Seconds; refreshes saved/offline rankings, minimum 5.
+
 # The default values for all playerdata
 # All new players will start with these values
 default-playerdata:

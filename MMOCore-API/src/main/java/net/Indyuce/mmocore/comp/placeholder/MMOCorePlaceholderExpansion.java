@@ -16,6 +16,12 @@ public class MMOCorePlaceholderExpansion extends PluginPlaceholderExpansion<Play
     }
 
     @Override
+    public String onRequest(OfflinePlayer player, @NotNull String raw) {
+        String result = MMOCore.plugin.classPlaceholders.request(player, raw);
+        return result != null ? result : super.onRequest(player, raw);
+    }
+
+    @Override
     public @NotNull Iterable<PlaceholderEntry<PlayerData>> getPlaceholderRegistry() {
         return Arrays.asList(PlaceholderEnum.values());
     }

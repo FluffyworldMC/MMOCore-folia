@@ -10,6 +10,8 @@ import net.Indyuce.mmocore.player.ClassDataContainer;
 import net.Indyuce.mmocore.skill.RegisteredSkill;
 import net.Indyuce.mmocore.skilltree.SkillTreeNode;
 import net.Indyuce.mmocore.skilltree.tree.SkillTree;
+import net.Indyuce.mmocore.manager.data.sql.SQLDatabaseImpl;
+import io.lumine.mythic.lib.profile.SessionUpdateReason;
 import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -121,7 +123,9 @@ public class SavedClassInformation implements ClassDataContainer {
         this.skillTreeReallocationPoints = data.getSkillTreeReallocationPoints();
         this.skillReallocationPoints = data.getSkillReallocationPoints();
         this.experience = data.getExperience();
-        this.health = data.getLastHealth();
+        this.health = data instanceof PlayerData && ((PlayerData) data).isSessionReady()
+                && org.bukkit.Bukkit.isOwnedByCurrentRegion(((PlayerData) data).getPlayer())
+                ? ((PlayerData) data).getPlayer().getHealth() : data.getLastHealth();
         this.mana = data.getMana();
         this.stellium = data.getStellium();
         this.stamina = data.getStamina();
@@ -287,16 +291,27 @@ public class SavedClassInformation implements ClassDataContainer {
      * @param player  Player changing class
      */
     public void load(@NotNull PlayerClass profess, @NotNull PlayerData player) {
+        load(profess, player, true);
+    }
+
+    /** Restores database state without saving the outgoing class or sharing its progression. */
+    public void restore(@NotNull PlayerClass profess, @NotNull PlayerData player) {
+        load(profess, player, false);
+    }
+
+    private void load(@NotNull PlayerClass profess, @NotNull PlayerData player, boolean changingClass) {
 
         // TODO check all classes instead?
         // big hypothesis => last class is always the one with the highest progression
         @Nullable SavedClassInformation lastClassPlayed = null;
+        final boolean independentSQL = MMOCore.plugin.playerDataManager.getDatabase() instanceof SQLDatabaseImpl;
+        final boolean shareProgress = changingClass && !independentSQL;
 
         /*
          * Saves current class info inside a SavedClassInformation, only
          * if the class is a real class and not the default one.
          */
-        if (!player.getProfess().hasOption(ClassOption.DEFAULT) || MMOCore.plugin.configManager.saveDefaultClassInfo)
+        if (changingClass && (independentSQL || !player.getProfess().hasOption(ClassOption.DEFAULT) || MMOCore.plugin.configManager.saveDefaultClassInfo))
             player.applyClassInfo(player.getProfess(), lastClassPlayed = new SavedClassInformation(player));
 
         ///////////////////////////////////////////////
@@ -317,22 +332,22 @@ public class SavedClassInformation implements ClassDataContainer {
         ///////////////////////////////////////////////
 
         final var conf = MMOCore.plugin.configManager;
-        final var targetLevel = lastClassPlayed != null && conf.shareExp
+        final var targetLevel = shareProgress && lastClassPlayed != null && conf.shareExp
                 ? lastClassPlayed.level
                 : level;
-        final var targetExp = lastClassPlayed != null && conf.shareExp
+        final var targetExp = shareProgress && lastClassPlayed != null && conf.shareExp
                 ? lastClassPlayed.experience
                 : experience;
-        final var targetSkillPoints = lastClassPlayed != null && conf.shareSkillPts
+        final var targetSkillPoints = shareProgress && lastClassPlayed != null && conf.shareSkillPts
                 ? lastClassPlayed.skillPoints + lastClassPlayed.countSpentSkillPoints() - this.countSpentSkillPoints()
                 : this.skillPoints;
-        final var targetAttributePoints = lastClassPlayed != null && conf.shareAttributePts
+        final var targetAttributePoints = shareProgress && lastClassPlayed != null && conf.shareAttributePts
                 ? lastClassPlayed.attributePoints + lastClassPlayed.countSpentAttributePoints() - this.countSpentAttributePoints()
                 : this.attributePoints;
-        final var targetSkillReallocationPoints = lastClassPlayed != null && conf.shareSkillReallocPts
+        final var targetSkillReallocationPoints = shareProgress && lastClassPlayed != null && conf.shareSkillReallocPts
                 ? lastClassPlayed.skillReallocationPoints
                 : this.skillReallocationPoints;
-        final var targetAttributeReallocationPoints = lastClassPlayed != null && conf.shareAttributeReallocPts
+        final var targetAttributeReallocationPoints = shareProgress && lastClassPlayed != null && conf.shareAttributeReallocPts
                 ? lastClassPlayed.attributeReallocationPoints
                 : this.attributeReallocationPoints;
 
@@ -344,7 +359,7 @@ public class SavedClassInformation implements ClassDataContainer {
         // max level differences may break the previous class level
         // Fixes https://gitlab.com/phoenix-dvpmt/mmocore/-/work_items/1213
         player.setClass(profess);
-        player.setLevel(targetLevel, PlayerLevelChangeEvent.Reason.CHOOSE_CLASS);
+        player.setLevel(targetLevel, changingClass ? PlayerLevelChangeEvent.Reason.CHOOSE_CLASS : PlayerLevelChangeEvent.Reason.CHOOSE_PROFILE);
         player.setExperience(targetExp);
         player.setSkillPoints(targetSkillPoints);
         player.setAttributePoints(targetAttributePoints);
@@ -382,9 +397,11 @@ public class SavedClassInformation implements ClassDataContainer {
         player.unloadClassInfo(profess);
 
         // This needs to be done at the end to make sure the MAX_HEALTH/MAX_MANA/... stats are loaded.
-        player.loadResources(health, mana, stellium, stamina);
+        player.loadResources(health, mana, stamina, stellium);
         player.applyTemporaryTriggers();
         player.getStats().updateStats();
+        if (changingClass && independentSQL && player.isSessionReady())
+            MMOCore.plugin.playerDataManager.saveData(player, SessionUpdateReason.AUTOSAVE);
     }
 
     //region Player data progress synchronizer
