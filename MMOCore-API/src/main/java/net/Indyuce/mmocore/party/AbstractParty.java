@@ -49,7 +49,10 @@ public interface AbstractParty {
     }
 
     private static boolean areClose(Player source, Player target, double distance) {
-        return source.getWorld().equals(target.getWorld()) && source.getLocation().distanceSquared(target.getLocation()) <= distance * distance;
+        final var sourceLocation = source.getLocation();
+        final var targetLocation = target.getLocation();
+        return sourceLocation.getWorld().equals(targetLocation.getWorld())
+                && sourceLocation.distanceSquared(targetLocation) <= distance * distance;
     }
 
     /**

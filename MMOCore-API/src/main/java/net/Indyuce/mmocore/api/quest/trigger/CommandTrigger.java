@@ -4,6 +4,7 @@ import io.lumine.mythic.lib.MythicLib;
 import io.lumine.mythic.lib.api.MMOLineConfig;
 import io.lumine.mythic.lib.util.annotation.BackwardsCompatibility;
 import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.util.Tasks;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -19,8 +20,13 @@ public class CommandTrigger extends Trigger {
 
 	@Override
 	public void apply(PlayerData player) {
-		if(!player.isOnline()) return;
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), format(player.getPlayer()));
+		if (!player.isOnline()) return;
+		Player onlinePlayer = player.getPlayer();
+		Tasks.executeOnEntityThread(onlinePlayer, () -> {
+			// Placeholder expansions can read state owned by the player's region.
+			String formatted = format(onlinePlayer);
+			Tasks.runGlobal(() -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), formatted));
+		});
 	}
 
 	@BackwardsCompatibility(version = "1.12-SNAPSHOT")

@@ -9,6 +9,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.profess.PlayerClass;
 import net.Indyuce.mmocore.api.player.profess.SavedClassInformation;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import net.Indyuce.mmocore.player.Message;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -31,22 +32,24 @@ public class SelectCommandTreeNode extends CommandTreeNode {
         final var player = explorer.parse(argPlayer);
         final var profess = explorer.parse(argClass);
 
-        final var playerData = PlayerData.get(player);
+        return PlayerCommand.execute(player, explorer, () -> {
+            final var playerData = PlayerData.get(player);
 
-        // Cannot select already existing class
-        if (playerData.getProfess().equals(profess)) {
-            return explorer.fail("Player " + player.getName() + " is already a " + profess.getName() + ".");
-        }
+            // Cannot select already existing class
+            if (playerData.getProfess().equals(profess)) {
+                return explorer.fail("Player " + player.getName() + " is already a " + profess.getName() + ".");
+            }
 
-        final var called = new PlayerChangeClassEvent(playerData, profess, PlayerChangeClassEvent.Reason.COMMAND_SELECT);
-        Bukkit.getPluginManager().callEvent(called);
-        if (called.isCancelled()) return explorer.fail("Bukkit event canceled");
+            final var called = new PlayerChangeClassEvent(playerData, profess, PlayerChangeClassEvent.Reason.COMMAND_SELECT);
+            Bukkit.getPluginManager().callEvent(called);
+            if (called.isCancelled()) return explorer.fail("Bukkit event canceled");
 
-        (playerData.hasSavedClass(profess)
-                ? playerData.getClassInfo(profess)
-                : new SavedClassInformation(MMOCore.plugin.playerDataManager.getDefaultData()))
-                .load(profess, playerData);
-        Message.CLASS_SELECT.send(playerData, "class", profess.getName()); // Send message
-        return explorer.success("Class of player &6" + player.getName() + "&e changed to &6" + profess.getName() + "&e.");
+            (playerData.hasSavedClass(profess)
+                    ? playerData.getClassInfo(profess)
+                    : new SavedClassInformation(MMOCore.plugin.playerDataManager.getDefaultData()))
+                    .load(profess, playerData);
+            Message.CLASS_SELECT.send(playerData, "class", profess.getName()); // Send message
+            return explorer.success("Class of player &6" + player.getName() + "&e changed to &6" + profess.getName() + "&e.");
+        });
     }
 }

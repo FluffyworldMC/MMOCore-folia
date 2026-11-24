@@ -4,6 +4,7 @@ import io.lumine.mythic.lib.command.CommandTreeExplorer;
 import io.lumine.mythic.lib.command.CommandTreeNode;
 import io.lumine.mythic.lib.command.argument.Argument;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import net.Indyuce.mmocore.waypoint.Waypoint;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -25,7 +26,9 @@ public class TeleportCommandTreeNode extends CommandTreeNode {
         Waypoint waypoint = explorer.parse(argWaypoint);
         Player player = explorer.parse(argPlayer);
 
-        player.teleportAsync(waypoint.getLocation());
-        return explorer.success("Successfully teleported &6" + player.getName() + "&e to &6" + waypoint.getId());
+        return PlayerCommand.execute(player, explorer, () -> {
+            player.teleportAsync(waypoint.getLocation());
+            return explorer.success("Successfully teleported &6" + player.getName() + "&e to &6" + waypoint.getId());
+        });
     }
 }

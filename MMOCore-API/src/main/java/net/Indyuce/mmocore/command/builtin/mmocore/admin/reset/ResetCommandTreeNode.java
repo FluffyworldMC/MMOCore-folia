@@ -9,6 +9,7 @@ import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.attribute.PlayerAttribute;
 import net.Indyuce.mmocore.api.player.attribute.PlayerAttributes;
 import net.Indyuce.mmocore.experience.Profession;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -49,17 +50,19 @@ public class ResetCommandTreeNode extends CommandTreeNode {
             Player player = explorer.parse(argPlayer);
             final boolean givePoints = args.length > 4 && args[4].equalsIgnoreCase("-reallocate");
 
-            PlayerData data = PlayerData.get(player);
-            ResetClassesCommandTreeNode.resetClasses(data);
-            ResetLevelsCommandTreeNode.resetLevels(data);
-            ResetSkillsCommandTreeNode.resetSkills(data);
-            ResetQuestsCommandTreeNode.resetQuests(data);
-            ResetAttributesCommandTreeNode.resetAttributes(data, givePoints);
-            ResetWaypointsCommandTreeNode.resetWaypoints(data);
-            ResetSkillTreesCommandTreeNode.resetSkillTrees(data);
-            // Reset times-claimed not being properly emptied otherwise
-            data.getItemClaims().clear();
-            return explorer.success("Player data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                PlayerData data = PlayerData.get(player);
+                ResetClassesCommandTreeNode.resetClasses(data);
+                ResetLevelsCommandTreeNode.resetLevels(data);
+                ResetSkillsCommandTreeNode.resetSkills(data);
+                ResetQuestsCommandTreeNode.resetQuests(data);
+                ResetAttributesCommandTreeNode.resetAttributes(data, givePoints);
+                ResetWaypointsCommandTreeNode.resetWaypoints(data);
+                ResetSkillTreesCommandTreeNode.resetSkillTrees(data);
+                // Reset times-claimed not being properly emptied otherwise
+                data.getItemClaims().clear();
+                return explorer.success("Player data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
     }
 
@@ -73,8 +76,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
         public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
             Player player = explorer.parse(argPlayer);
 
-            resetWaypoints(PlayerData.get(player));
-            return explorer.success("Waypoint data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetWaypoints(PlayerData.get(player));
+                return explorer.success("Waypoint data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
 
         static void resetWaypoints(@NotNull PlayerData playerData) {
@@ -91,8 +96,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
         public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
             Player player = explorer.parse(argPlayer);
 
-            resetQuests(PlayerData.get(player));
-            return explorer.success("Quest data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetQuests(PlayerData.get(player));
+                return explorer.success("Quest data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
 
         static void resetQuests(@NotNull PlayerData data) {
@@ -110,8 +117,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
         public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
             Player player = explorer.parse(argPlayer);
 
-            resetSkills(PlayerData.get(player));
-            return explorer.success("Skill data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetSkills(PlayerData.get(player));
+                return explorer.success("Skill data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
 
         static void resetSkills(@NotNull PlayerData data) {
@@ -129,8 +138,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
         public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
             Player player = explorer.parse(argPlayer);
 
-            resetSkillTrees(PlayerData.get(player));
-            return explorer.success("Skill tree data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetSkillTrees(PlayerData.get(player));
+                return explorer.success("Skill tree data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
 
         // TODO option to reallocate skill tree points instead of not giving any back
@@ -151,8 +162,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
             Player player = explorer.parse(argPlayer);
 
             final boolean givePoints = args.length > 4 && args[4].equalsIgnoreCase("-reallocate");
-            resetAttributes(PlayerData.get(player), givePoints);
-            return explorer.success("Attribute data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetAttributes(PlayerData.get(player), givePoints);
+                return explorer.success("Attribute data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
 
         static void resetAttributes(@NotNull PlayerData data, boolean givePoints) {
@@ -186,8 +199,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
         public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
             Player player = explorer.parse(argPlayer);
 
-            resetLevels(PlayerData.get(player));
-            return explorer.success("Main and profession levels of &6" + player.getName() + "&e were successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetLevels(PlayerData.get(player));
+                return explorer.success("Main and profession levels of &6" + player.getName() + "&e were successfully reset.");
+            });
         }
 
         static void resetLevels(@NotNull PlayerData data) {
@@ -215,8 +230,10 @@ public class ResetCommandTreeNode extends CommandTreeNode {
         public @NotNull CommandResult execute(CommandTreeExplorer explorer, CommandSender sender, String[] args) {
             Player player = explorer.parse(argPlayer);
 
-            resetClasses(PlayerData.get(player));
-            return explorer.success("Class data of &6" + player.getName() + "&e was successfully reset.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                resetClasses(PlayerData.get(player));
+                return explorer.success("Class data of &6" + player.getName() + "&e was successfully reset.");
+            });
         }
 
         static void resetClasses(@NotNull PlayerData data) {

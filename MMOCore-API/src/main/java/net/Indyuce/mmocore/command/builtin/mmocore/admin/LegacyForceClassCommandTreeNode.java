@@ -8,6 +8,7 @@ import net.Indyuce.mmocore.api.event.PlayerChangeClassEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.profess.PlayerClass;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -39,12 +40,14 @@ public class LegacyForceClassCommandTreeNode extends CommandTreeNode {
 
         PlayerClass profess = MMOCore.plugin.classManager.get(format);
 
-        PlayerData data = PlayerData.get(player);
-        final var called = new PlayerChangeClassEvent(data, profess, PlayerChangeClassEvent.Reason.COMMAND_FORCE);
-        Bukkit.getPluginManager().callEvent(called);
-        if (called.isCancelled()) return explorer.fail("Bukkit event canceled");
+        return PlayerCommand.execute(player, explorer, () -> {
+            PlayerData data = PlayerData.get(player);
+            final var called = new PlayerChangeClassEvent(data, profess, PlayerChangeClassEvent.Reason.COMMAND_FORCE);
+            Bukkit.getPluginManager().callEvent(called);
+            if (called.isCancelled()) return explorer.fail("Bukkit event canceled");
 
-        data.setClass(profess);
-        return explorer.success("&6" + player.getName() + "&e is now a &6" + profess.getName());
+            data.setClass(profess);
+            return explorer.success("&6" + player.getName() + "&e is now a &6" + profess.getName());
+        });
     }
 }

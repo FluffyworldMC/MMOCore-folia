@@ -13,6 +13,7 @@ import net.Indyuce.mmocore.api.util.MMOCoreUtils;
 import net.Indyuce.mmocore.party.AbstractParty;
 import net.Indyuce.mmocore.player.Message;
 import net.Indyuce.mmocore.util.Language;
+import net.Indyuce.mmocore.util.Tasks;
 import net.Indyuce.mmocore.util.formula.FormulaFailsafeException;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -192,8 +193,10 @@ public class PlayerProfessions {
         if (splitExp && (party = playerData.getParty()) != null && MMOCore.plugin.configManager.splitProfessionExp) {
             var nearbyMembers = party.findPlayersForExp(getPlayerData());
             value /= (nearbyMembers.size() + 1); // Share exp
+            final double share = value;
             for (PlayerData member : nearbyMembers)
-                member.getCollectionSkills().giveExperience(profession, value, source, null, false);
+                Tasks.executeOnEntityThread(member.getPlayer(), () ->
+                        member.getCollectionSkills().giveExperience(profession, share, source, null, false));
         }
 
         // Apply buffs AFTER splitting exp

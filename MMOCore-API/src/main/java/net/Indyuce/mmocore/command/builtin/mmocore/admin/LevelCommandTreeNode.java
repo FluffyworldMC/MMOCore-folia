@@ -7,6 +7,7 @@ import io.lumine.mythic.lib.util.TriConsumer;
 import net.Indyuce.mmocore.api.event.PlayerLevelChangeEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import net.Indyuce.mmocore.experience.EXPSource;
 import net.Indyuce.mmocore.experience.PlayerProfessions;
 import net.Indyuce.mmocore.experience.Profession;
@@ -60,14 +61,16 @@ public class LevelCommandTreeNode extends CommandTreeNode {
             final var profession = explorer.parse(argProfession);
             final var amount = explorer.parse(argAmount);
 
-            PlayerData data = PlayerData.get(player);
-            if (profession == null) {
-                main.accept(data, amount);
-                return explorer.success("&6" + player.getName() + "&e is now Lvl &6" + data.getLevel());
-            }
+            return PlayerCommand.execute(player, explorer, () -> {
+                PlayerData data = PlayerData.get(player);
+                if (profession == null) {
+                    main.accept(data, amount);
+                    return explorer.success("&6" + player.getName() + "&e is now Lvl &6" + data.getLevel());
+                }
 
-            this.profession.accept(data.getCollectionSkills(), profession, amount);
-            return explorer.success("&6" + player.getName() + "&e is now Lvl &6" + data.getCollectionSkills().getLevel(profession) + "&e in &6" + profession.getName());
+                this.profession.accept(data.getCollectionSkills(), profession, amount);
+                return explorer.success("&6" + player.getName() + "&e is now Lvl &6" + data.getCollectionSkills().getLevel(profession) + "&e in &6" + profession.getName());
+            });
         }
     }
 }

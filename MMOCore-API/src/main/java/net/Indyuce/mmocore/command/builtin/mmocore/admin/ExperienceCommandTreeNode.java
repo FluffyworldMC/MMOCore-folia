@@ -8,6 +8,7 @@ import io.lumine.mythic.lib.util.QuadConsumer;
 import io.lumine.mythic.lib.util.TriConsumer;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import net.Indyuce.mmocore.experience.EXPSource;
 import net.Indyuce.mmocore.experience.PlayerProfessions;
 import net.Indyuce.mmocore.experience.Profession;
@@ -51,14 +52,16 @@ public class ExperienceCommandTreeNode extends CommandTreeNode {
             final var player = explorer.parse(this.argPlayer);
             final @Nullable var profession = explorer.parse(this.argProfession);
 
-            PlayerData data = PlayerData.get(player);
-            final var formatter = MythicLib.plugin.getMMOConfig().decimal;
+            return PlayerCommand.execute(player, explorer, () -> {
+                PlayerData data = PlayerData.get(player);
+                final var formatter = MythicLib.plugin.getMMOConfig().decimal;
 
-            if (profession == null)
-                return explorer.success("&6" + player.getName() + "&e has &6" + formatter.format(data.getExperience()) + "&e class EXP.");
+                if (profession == null)
+                    return explorer.success("&6" + player.getName() + "&e has &6" + formatter.format(data.getExperience()) + "&e class EXP.");
 
-            final var currentExp = data.getCollectionSkills().getExperience(profession);
-            return explorer.success("&6" + player.getName() + "&e has &6" + formatter.format(currentExp) + "&e EXP in &6" + profession.getName() + "&e.");
+                final var currentExp = data.getCollectionSkills().getExperience(profession);
+                return explorer.success("&6" + player.getName() + "&e has &6" + formatter.format(currentExp) + "&e EXP in &6" + profession.getName() + "&e.");
+            });
         }
     }
 
@@ -94,17 +97,19 @@ public class ExperienceCommandTreeNode extends CommandTreeNode {
             final @Nullable var profession = explorer.parse(this.argProfession);
             final var split = this.argSplit != null && explorer.parse(this.argSplit);
 
-            PlayerData data = PlayerData.get(player);
-            final var formatter = MythicLib.plugin.getMMOConfig().decimal;
+            return PlayerCommand.execute(player, explorer, () -> {
+                PlayerData data = PlayerData.get(player);
+                final var formatter = MythicLib.plugin.getMMOConfig().decimal;
 
-            if (profession == null) {
-                main.accept(data, amount, split);
-                return explorer.success("&6" + player.getName() + "&e now has &6" + formatter.format(data.getExperience()) + "&e class EXP.");
-            }
+                if (profession == null) {
+                    main.accept(data, amount, split);
+                    return explorer.success("&6" + player.getName() + "&e now has &6" + formatter.format(data.getExperience()) + "&e class EXP.");
+                }
 
-            this.profession.accept(data.getCollectionSkills(), profession, amount, split);
-            final var currentExp = data.getCollectionSkills().getExperience(profession);
-            return explorer.success("&6" + player.getName() + "&e now has &6" + formatter.format(currentExp) + "&e EXP in &6" + profession.getName() + "&e.");
+                this.profession.accept(data.getCollectionSkills(), profession, amount, split);
+                final var currentExp = data.getCollectionSkills().getExperience(profession);
+                return explorer.success("&6" + player.getName() + "&e now has &6" + formatter.format(currentExp) + "&e EXP in &6" + profession.getName() + "&e.");
+            });
         }
     }
 }

@@ -1066,8 +1066,9 @@ public class PlayerData extends SynchronizedDataHolder implements OfflinePlayerD
         if (splitExp && (party = getParty()) != null && MMOCore.plugin.configManager.splitMainExp) {
             var nearbyMembers = party.findPlayersForExp(this);
             value /= (nearbyMembers.size() + 1); // Share exp
+            final double share = value;
             for (PlayerData member : nearbyMembers)
-                member.giveExperience(value, source, null, false);
+                Tasks.executeOnEntityThread(member.getPlayer(), () -> member.giveExperience(share, source, null, false));
         }
 
         // Must be placed after exp splitting

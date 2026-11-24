@@ -86,6 +86,11 @@ public final class Tasks {
         entity.getScheduler().execute(MMOCore.plugin, task, null, 0L);
     }
 
+    public static void executeOnEntityThread(Entity entity, Runnable task) {
+        if (Bukkit.isOwnedByCurrentRegion(entity)) task.run();
+        else executeEntity(entity, task);
+    }
+
     public static ScheduledTask runEntity(Entity entity, Runnable task) {
         return entity.getScheduler().run(MMOCore.plugin, scheduled -> task.run(), null);
     }

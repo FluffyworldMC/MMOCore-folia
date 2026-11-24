@@ -7,6 +7,7 @@ import io.lumine.mythic.lib.player.resource.ResourceUpdateReason;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.profess.resource.PlayerResource;
 import net.Indyuce.mmocore.api.quest.trigger.ManaTrigger;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -46,9 +47,11 @@ public class ResourceCommandTreeNode extends CommandTreeNode {
             final var player = explorer.parse(argPlayer);
             final var amount = explorer.parse(argAmount);
 
-            PlayerData data = PlayerData.get(player);
-            resource.getConsumer(action).accept(data, amount, ResourceUpdateReason.COMMAND);
-            return explorer.success("&6" + player.getName() + "&e now has &6" + resource.getCurrent(data) + "&e " + type + " points.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                PlayerData data = PlayerData.get(player);
+                resource.getConsumer(action).accept(data, amount, ResourceUpdateReason.COMMAND);
+                return explorer.success("&6" + player.getName() + "&e now has &6" + resource.getCurrent(data) + "&e " + type + " points.");
+            });
         }
     }
 }

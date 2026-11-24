@@ -6,6 +6,7 @@ import io.lumine.mythic.lib.command.argument.Argument;
 import io.lumine.mythic.lib.util.TriConsumer;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import net.Indyuce.mmocore.skilltree.tree.SkillTree;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -51,10 +52,12 @@ public class SkillTreePointsCommandTreeNode extends CommandTreeNode {
             final var amount = explorer.parse(argAmount);
             final @Nullable var skillTree = explorer.parse(argType);
 
-            final var skillTreeName = skillTree == null ? "global" : skillTree.getId();
-            final var data = PlayerData.get(player);
-            action.accept(data, amount, skillTree);
-            return explorer.success("&6" + player.getName() + "&e now has &6" + get.apply(data, skillTree) + "&e " + skillTreeName + " skill tree points.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                final var skillTreeName = skillTree == null ? "global" : skillTree.getId();
+                final var data = PlayerData.get(player);
+                action.accept(data, amount, skillTree);
+                return explorer.success("&6" + player.getName() + "&e now has &6" + get.apply(data, skillTree) + "&e " + skillTreeName + " skill tree points.");
+            });
         }
     }
 }

@@ -7,6 +7,7 @@ import net.Indyuce.mmocore.api.event.PlayerChangeClassEvent;
 import net.Indyuce.mmocore.api.player.PlayerData;
 import net.Indyuce.mmocore.api.player.profess.PlayerClass;
 import net.Indyuce.mmocore.command.Arguments;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -28,18 +29,20 @@ public class ForceCommandTreeNode extends CommandTreeNode {
         final var player = explorer.parse(argPlayer);
         final var profess = explorer.parse(argClass);
 
-        final var playerData = PlayerData.get(player);
+        return PlayerCommand.execute(player, explorer, () -> {
+            final var playerData = PlayerData.get(player);
 
-        // Cannot select already existing class
-        if (playerData.getProfess().equals(profess)) {
-            return explorer.fail("Player " + player.getName() + " is already a " + profess.getName() + ".");
-        }
+            // Cannot select already existing class
+            if (playerData.getProfess().equals(profess)) {
+                return explorer.fail("Player " + player.getName() + " is already a " + profess.getName() + ".");
+            }
 
-        final var called = new PlayerChangeClassEvent(playerData, profess, PlayerChangeClassEvent.Reason.COMMAND_FORCE);
-        Bukkit.getPluginManager().callEvent(called);
-        if (called.isCancelled()) return explorer.fail("Bukkit event canceled");
+            final var called = new PlayerChangeClassEvent(playerData, profess, PlayerChangeClassEvent.Reason.COMMAND_FORCE);
+            Bukkit.getPluginManager().callEvent(called);
+            if (called.isCancelled()) return explorer.fail("Bukkit event canceled");
 
-        playerData.setClass(profess);
-        return explorer.success("Class of player &6" + player.getName() + "&e forcefully set to &6" + profess.getName());
+            playerData.setClass(profess);
+            return explorer.success("Class of player &6" + player.getName() + "&e forcefully set to &6" + profess.getName());
+        });
     }
 }

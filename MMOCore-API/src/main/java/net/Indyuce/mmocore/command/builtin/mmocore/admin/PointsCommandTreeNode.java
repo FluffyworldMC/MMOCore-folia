@@ -4,6 +4,7 @@ import io.lumine.mythic.lib.command.CommandTreeExplorer;
 import io.lumine.mythic.lib.command.CommandTreeNode;
 import io.lumine.mythic.lib.command.argument.Argument;
 import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.command.PlayerCommand;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -46,9 +47,11 @@ public class PointsCommandTreeNode extends CommandTreeNode {
             final var player = explorer.parse(argPlayer);
             final var amount = explorer.parse(argAmount);
 
-            PlayerData data = PlayerData.get(player);
-            action.accept(data, amount);
-            return explorer.success("&6" + player.getName() + "&e now has &6" + get.apply(data) + "&e " + type + " points.");
+            return PlayerCommand.execute(player, explorer, () -> {
+                PlayerData data = PlayerData.get(player);
+                action.accept(data, amount);
+                return explorer.success("&6" + player.getName() + "&e now has &6" + get.apply(data) + "&e " + type + " points.");
+            });
         }
     }
 }

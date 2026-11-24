@@ -35,15 +35,6 @@ public class PlayerQuests implements Closeable {
         this.playerData = playerData;
 
         bossbarNamespacedKey = new NamespacedKey(MMOCore.plugin, "quest_progress_" + playerData.getUniqueId());
-/*
-        Bukkit.getScheduler().runTaskTimer(MMOCore.plugin, () -> {
-
-            Bukkit.broadcastMessage("bossbar=" + bossbar);
-            Bukkit.broadcastMessage("current=" + current);
-
-
-        }, 20, 20);
-        */
     }
 
     public PlayerQuests load(ConfigurationSection config) {
